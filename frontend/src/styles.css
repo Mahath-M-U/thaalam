@@ -533,6 +533,53 @@ code {
   font-style: italic;
 }
 
+.brief-text {
+  color: var(--body-strong);
+  font-size: 1rem;
+  line-height: 1.55;
+  margin: 0 0 1rem;
+}
+
+.brief-questions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.brief-question {
+  flex: 1 1 260px;
+}
+
+.brief-question-btn {
+  width: 100%;
+  text-align: left;
+  font-size: 0.85rem;
+  padding: 0.55rem 0.9rem;
+}
+
+.brief-question-btn.active {
+  border-color: var(--ink);
+  background: var(--surface-strong);
+}
+
+.brief-answer {
+  margin-top: 0.5rem;
+  padding: 0.7rem 0.9rem;
+  background: var(--canvas-soft);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  font-size: 0.88rem;
+  color: var(--body);
+}
+
+.brief-answer p {
+  margin: 0;
+}
+
+.brief-answer-error {
+  color: var(--error);
+}
+
 .chart-grid > .wide {
   grid-column: 1 / -1;
 }

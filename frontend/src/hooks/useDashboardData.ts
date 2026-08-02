@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
 import type {
   CycleRecord,
+  DailyBriefResponse,
   DailyRecord,
   InsightsResponse,
   ProfileResponse,
@@ -24,6 +25,7 @@ export interface DashboardData {
   sleepStages: SleepStage[];
   sports: SportStrain[];
   insights: InsightsResponse;
+  dailyBrief: DailyBriefResponse;
 }
 
 interface State {
@@ -53,6 +55,7 @@ export function useDashboardData() {
         stagesRes,
         sportsRes,
         insights,
+        dailyBrief,
       ] = await Promise.all([
         api.summary(),
         api.profile(),
@@ -64,6 +67,7 @@ export function useDashboardData() {
         api.sleepStages(),
         api.workoutsBySport(),
         api.insights(),
+        api.dailyBrief(),
       ]);
 
       setState({
@@ -80,6 +84,7 @@ export function useDashboardData() {
           sleepStages: stagesRes.stages,
           sports: sportsRes.sports,
           insights,
+          dailyBrief,
         },
       });
     } catch (err) {

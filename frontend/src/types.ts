@@ -265,3 +265,18 @@ export interface InsightsResponse {
   };
   disclaimer?: string;
 }
+
+export interface DailyBriefResponse {
+  ready: boolean;
+  message?: string | null;
+  date: string | null;
+  brief: string | null;
+  rule_ids: string[];
+}
+
+export interface BriefExplainerResponse {
+  question_key: string;
+  question: string;
+  answer: string;
+}
+

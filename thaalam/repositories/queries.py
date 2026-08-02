@@ -114,9 +114,11 @@ def load_daily_summary(con: duckdb.DuckDBPyConnection) -> pd.DataFrame:
             r.recovery_score,
             r.resting_heart_rate,
             r.hrv_rmssd_milli,
+            r.skin_temp_celsius,
             s.sleep_performance_percentage,
             s.sleep_consistency_percentage,
             s.sleep_efficiency_percentage,
+            s.respiratory_rate,
             s.stage_summary
         FROM cycles c
         LEFT JOIN recovery r ON r.cycle_id = c.id

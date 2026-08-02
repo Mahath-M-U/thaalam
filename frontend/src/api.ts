@@ -1,5 +1,7 @@
 import type {
+  BriefExplainerResponse,
   CycleRecord,
+  DailyBriefResponse,
   DailyRecord,
   InsightsResponse,
   ProfileResponse,
@@ -39,4 +41,7 @@ export const api = {
   sleepStages: () => getJson<{ stages: SleepStage[]; nights?: number }>("/api/sleep/stages/average"),
   workoutsBySport: () => getJson<{ sports: SportStrain[] }>("/api/workouts/by-sport"),
   insights: () => getJson<InsightsResponse>("/api/insights"),
+  dailyBrief: () => getJson<DailyBriefResponse>("/api/brief"),
+  briefExplain: (question: string) =>
+    getJson<BriefExplainerResponse>(`/api/brief/explain?question=${encodeURIComponent(question)}`),
 };

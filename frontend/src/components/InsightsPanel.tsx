@@ -12,20 +12,23 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { InsightsResponse } from "../types";
+import type { InsightsResponse, DailyBriefResponse } from "../types";
 import { shortDate } from "../utils";
 import { ChartCard } from "./ChartCard";
+import { DailyBriefCard } from "./DailyBriefCard";
 import { Section } from "./Section";
 import { CHART_COLORS, axisLine, axisTick, gridStroke, legendStyle, tooltipStyle } from "../chartTheme";
 
 interface Props {
   insights: InsightsResponse;
+  dailyBrief: DailyBriefResponse;
 }
 
-export function InsightsPanel({ insights }: Props) {
+export function InsightsPanel({ insights, dailyBrief }: Props) {
   if (!insights.ready) {
     return (
       <Section id="insights" title="Insights" accent={CHART_COLORS.rose}>
+        <DailyBriefCard brief={dailyBrief} />
         <ChartCard title="Derived insights">
           <p className="empty-chart">{insights.message ?? "Not enough data yet."}</p>
         </ChartCard>
@@ -56,6 +59,8 @@ export function InsightsPanel({ insights }: Props) {
 
   return (
     <Section id="insights" title="Derived insights" accent={CHART_COLORS.rose}>
+      <DailyBriefCard brief={dailyBrief} />
+
       <div className="insight-meta wide">
         <p>
           Built from <strong>{insights.generated_from_days}</strong> days

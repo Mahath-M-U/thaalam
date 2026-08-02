@@ -118,7 +118,7 @@ export default function App() {
               <StatCards stats={data.summary.stats} latest={data.summary.latest} />
             </div>
 
-            <InsightsPanel insights={data.insights} />
+            <InsightsPanel insights={data.insights} dailyBrief={data.dailyBrief} />
 
             <Section id="recovery" title="Recovery" accent={CHART_COLORS.recovery}>
               <RecoveryChart records={data.recovery} />

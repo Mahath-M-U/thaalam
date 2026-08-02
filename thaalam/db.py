@@ -130,6 +130,19 @@ _SCHEMA_STATEMENTS = [
         last_synced_at TIMESTAMP
     )
     """,
+    # Rule-based daily insight brief (see thaalam.services.brief_service) --
+    # logged for history/audit (which rules fire most often), not a cache,
+    # since generation is free/instant and re-run on every page load.
+    """
+    CREATE TABLE IF NOT EXISTS insight_briefs (
+        user_id BIGINT,
+        brief_date DATE,
+        brief_text VARCHAR,
+        rule_ids VARCHAR,
+        generated_at TIMESTAMP,
+        PRIMARY KEY (user_id, brief_date)
+    )
+    """,
     # Live per-beat samples captured locally over Bluetooth from WHOOP's
     # official "HR Broadcast" feature (see thaalam.ble_stream). This is an
     # append-only telemetry log, not a synced-from-API entity, so rows have
@@ -370,6 +383,22 @@ def insert_hr_broadcast_samples(
         rows,
     )
     logger.debug("Inserted %d live HR broadcast sample(s)", len(rows))
+
+
+def record_insight_brief(
+    con: duckdb.DuckDBPyConnection,
+    user_id: int,
+    brief_date: str,
+    brief_text: str,
+    rule_ids: list[str],
+) -> None:
+    """Log a generated daily brief for history/audit -- not a cache."""
+    _upsert(
+        con,
+        "insight_briefs",
+        ["user_id", "brief_date", "brief_text", "rule_ids", "generated_at"],
+        [(user_id, brief_date, brief_text, _as_json(rule_ids), datetime.now(timezone.utc))],
+    )
 
 
 def upsert_workouts(con: duckdb.DuckDBPyConnection, workouts: list[dict[str, Any]]) -> None:
