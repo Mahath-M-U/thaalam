@@ -1,5 +1,8 @@
+from thaalam.app import main as run_whoop_sync
+
+
 def main():
-    print("Hello from thaalam!")
+    run_whoop_sync()
 
 
 if __name__ == "__main__":

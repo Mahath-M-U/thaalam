@@ -1,0 +1,19 @@
+import type { ReactNode } from "react";
+
+interface Props {
+  id: string;
+  title: string;
+  accent: string;
+  children: ReactNode;
+}
+
+export function Section({ id, title, accent, children }: Props) {
+  return (
+    <section id={id} className="section">
+      <h2 className="section-title" style={{ borderLeftColor: accent }}>
+        {title}
+      </h2>
+      <div className="chart-grid">{children}</div>
+    </section>
+  );
+}

@@ -9,3 +9,13 @@ wheels/
 # Virtual environments
 .venv
 .env
+
+# Local WHOOP data (DuckDB database + cached OAuth token)
+data/
+docs/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+*/tests_*
