@@ -50,6 +50,7 @@ export function HyperarousalDive({ read, dive, onBack }: Props) {
       title={read.title}
       subtitle={read.subtitle}
       meaning={dive.meaning}
+      finding={read.finding}
       methodology={read.methodology}
       onBack={onBack}
       hero={

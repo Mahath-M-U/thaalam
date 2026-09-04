@@ -47,6 +47,7 @@ export function CardiacEfficiencyDive({ read, dive, onBack }: Props) {
       title={read.title}
       subtitle={read.subtitle}
       meaning={dive.meaning}
+      finding={read.finding}
       methodology={read.methodology}
       onBack={onBack}
       hero={
@@ -55,6 +56,7 @@ export function CardiacEfficiencyDive({ read, dive, onBack }: Props) {
             progress={read.progress}
             needed={read.progress_needed}
             label="cardiac efficiency"
+            unit="sessions"
           />
         ) : (
           <div className="sport-tabs">
@@ -112,7 +114,12 @@ export function CardiacEfficiencyPreview({
   if (read.calibrating || series.length < 2) {
     return (
       <ChartCard title="Cardiac Efficiency Drift by Sport" description="Heart rate at comparable external work">
-        <CalibratingNote progress={read.progress} needed={read.progress_needed} label="cardiac efficiency" />
+        <CalibratingNote
+          progress={read.progress}
+          needed={read.progress_needed}
+          label="cardiac efficiency"
+          unit="sessions"
+        />
         <p className="chart-footnote">{read.methodology}</p>
       </ChartCard>
     );

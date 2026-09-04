@@ -1,8 +1,8 @@
 """Server-side derived metrics stored in DuckDB.
 
 The client never recomputes a baseline, slope, or projection -- it reads
-the stored `derived_baselines` row. Later PRs fill in score/reads/runway
-via `recompute()`; this module computes baselines from real WHOOP rows.
+the stored `derived_baselines` and `derived_reads` rows. `recompute()`
+stores baselines and the eleven reads from real WHOOP rows.
 """
 
 from __future__ import annotations

@@ -48,11 +48,12 @@ def _seed_night(
     debt_h: float = 0.4,
     consistency: float = 80.0,
     start_hour: int = 23,
+    end_hour: int = 7,
 ) -> None:
     wake = ORIGIN + timedelta(days=index)
-    sleep_end = wake
+    sleep_end = datetime(wake.year, wake.month, wake.day, end_hour, 0, 0)
     sleep_start = datetime(wake.year, wake.month, wake.day, start_hour, 0, 0)
-    if start_hour >= 12:
+    if sleep_start >= sleep_end:
         sleep_start -= timedelta(days=1)
     cycle_id = 1000 + index
     sleep_id = f"sleep-{cycle_id}"
@@ -287,6 +288,8 @@ def test_cardiac_efficiency_disables_sport_without_matched_sessions(tmp_db):
     sports = {s["sport_name"]: s for s in dive["sports"]}
     assert sports["running"]["enabled"] is True
     assert sports["running"]["matched"] >= CARDIAC_MIN_MATCHED
+    # First-half vs last-half of 8 matched sessions (155..148) → −4 bpm, not first-2 vs last-2.
+    assert sports["running"]["delta_bpm"] == pytest.approx(-4.0, abs=0.2)
     assert sports["running"]["delta_bpm"] < 0
     assert sports["cycling"]["enabled"] is False
     assert sports["cycling"]["series"]  # real matched points only, no filler
@@ -381,13 +384,48 @@ def test_circadian_phase_uses_own_midpoint_not_a_clock_ideal(tmp_db):
     row = payload["circadian_phase"]
     assert row["calibrating"] is False
     assert row["unit"] == "min"
-    assert "21-night mean" in row["finding"]
+    assert "21-night circular mean" in row["finding"]
     dive = get_read_dive_payload(tmp_db, "circadian_phase")["dive"]
     assert dive["calendar"]
     assert dive["penalty_bars"]
     assert dive["midpoint_mean_21d"] is not None
     # Last night started 02:00 instead of 23:00 → ~+180 min shift, not vs 00:00.
     assert abs(dive["latest_shift_min"]) > 60
+
+
+def test_circadian_phase_unwraps_midnight_midpoints(tmp_db):
+    _seed_profile(tmp_db)
+    # 20:00→03:00 midpoint 23:30, last night 21:00→04:00 midpoint 00:30.
+    for i in range(27):
+        _seed_night(tmp_db, i, start_hour=20, end_hour=3, hrv=55)
+    _seed_night(tmp_db, 27, start_hour=21, end_hour=4, hrv=42)
+    payload = _by_id(get_reads_payload(tmp_db))
+    row = payload["circadian_phase"]
+    assert row["calibrating"] is False
+    # Linear clock math would report ~−20 h; circular unwrap is about +60 min.
+    assert abs(row["value"]) < 180
+    assert row["value"] == pytest.approx(60, abs=20)
+    dive = get_read_dive_payload(tmp_db, "circadian_phase")["dive"]
+    assert abs(dive["latest_shift_min"]) < 180
+    assert "circular mean" in row["finding"]
+    assert "shift band" in row["finding"]
+
+
+def test_timing_regularity_says_duration_leads_when_it_does(tmp_db):
+    _seed_profile(tmp_db)
+    for i in range(STAGE_WINDOW + 12):
+        rem = 0.8 + (i % 6) * 0.35
+        hrv = 38 + rem * 14
+        start_hour = 23 if i % 9 else 22
+        _seed_night(tmp_db, i, rem_h=rem, deep_h=1.1, light_h=4.0, hrv=hrv, start_hour=start_hour)
+    payload = _by_id(get_reads_payload(tmp_db))
+    row = payload["timing_regularity"]
+    assert row["calibrating"] is False
+    finding = row["finding"]
+    assert "× more" not in finding
+    if row["value"] is not None and row["value"] < 1:
+        assert "duration explains" in finding
+        assert "timing explains" not in finding
 
 
 def test_unknown_read_id_is_absent(tmp_db):

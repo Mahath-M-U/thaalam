@@ -7,10 +7,19 @@ interface Props {
   title: string;
   subtitle?: string | null;
   meaning?: string | null;
+  finding?: string | null;
   methodology?: string | null;
   onBack: () => void;
   hero?: ReactNode;
   children?: ReactNode;
+}
+
+function asMeaning(text?: string | null): string | null {
+  if (!text) return null;
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  const capped = trimmed[0].toUpperCase() + trimmed.slice(1);
+  return /[.!?]$/.test(capped) ? capped : `${capped}.`;
 }
 
 export function DeepDive({
@@ -18,11 +27,13 @@ export function DeepDive({
   title,
   subtitle,
   meaning,
+  finding,
   methodology,
   onBack,
   hero,
   children,
 }: Props) {
+  const meaningText = asMeaning(meaning) || asMeaning(finding);
   return (
     <article className="deep-dive">
       <button type="button" className="deep-dive-back" onClick={onBack}>
@@ -32,10 +43,10 @@ export function DeepDive({
       <h2>{title}</h2>
       {subtitle ? <p className="deep-dive-sub">{subtitle}</p> : null}
       {hero ? <div className="deep-dive-hero">{hero}</div> : null}
-      {meaning ? (
+      {meaningText ? (
         <section className="what-it-means">
           <div className="what-it-means-kicker">What it means</div>
-          <p>{meaning}</p>
+          <p>{meaningText}</p>
         </section>
       ) : null}
       {children ? <div className="deep-dive-breakdown">{children}</div> : null}
@@ -68,7 +79,8 @@ export function GenericReadDive({
       kicker={GROUP_KICKER[read.group] ?? "Read"}
       title={read.title}
       subtitle={read.subtitle}
-      meaning={meaning || (read.finding ? read.finding[0].toUpperCase() + read.finding.slice(1) + "." : null)}
+      meaning={meaning}
+      finding={read.finding}
       methodology={read.methodology}
       onBack={onBack}
       hero={
@@ -105,10 +117,12 @@ export function CalibratingNote({
   progress,
   needed,
   label,
+  unit = "nights",
 }: {
   progress?: number | null;
   needed?: number | null;
   label: string;
+  unit?: string;
 }) {
   const have = progress ?? 0;
   const want = needed ?? 0;
@@ -116,7 +130,7 @@ export function CalibratingNote({
   return (
     <div className="calibrating-note">
       <p>
-        {have} of {want} nights — still calibrating {label} against your own history
+        {have} of {want} {unit} — still calibrating {label} against your own history
       </p>
       {want > 0 ? (
         <div className="calibrating-bar" aria-hidden="true">

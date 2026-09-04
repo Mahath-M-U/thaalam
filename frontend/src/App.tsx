@@ -62,6 +62,7 @@ export default function App() {
   const [readsPayload, setReadsPayload] = useState<DerivedReadsResponse | null>(null);
   const [openRead, setOpenRead] = useState<string | null>(null);
   const [divePayload, setDivePayload] = useState<DerivedReadDiveResponse | null>(null);
+  const [diveStatus, setDiveStatus] = useState<"idle" | "loading" | "error">("idle");
 
   useEffect(() => {
     if (!data) return;
@@ -74,12 +75,27 @@ export default function App() {
   useEffect(() => {
     if (!openRead) {
       setDivePayload(null);
+      setDiveStatus("idle");
       return;
     }
+    let cancelled = false;
+    setDiveStatus("loading");
+    setDivePayload(null);
     void api
       .derivedReadDive(openRead)
-      .then(setDivePayload)
-      .catch(() => setDivePayload(null));
+      .then((payload) => {
+        if (cancelled) return;
+        setDivePayload(payload);
+        setDiveStatus(payload.present && payload.read ? "idle" : "error");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setDivePayload(null);
+        setDiveStatus("error");
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [openRead]);
 
   const handleRefresh = async () => {
@@ -253,8 +269,19 @@ export default function App() {
                 dive={divePayload.dive}
                 onBack={() => setOpenRead(null)}
               />
+              ) : diveStatus === "error" ? (
+                <div className="state-panel error">
+                  <button type="button" className="deep-dive-back" onClick={() => setOpenRead(null)}>
+                    ← Back
+                  </button>
+                  <h2>Could not load this read</h2>
+                  <p>That deep dive is not available yet. Try again after a refresh, or pick another read.</p>
+                </div>
               ) : (
                 <div className="state-panel">
+                  <button type="button" className="deep-dive-back" onClick={() => setOpenRead(null)}>
+                    ← Back
+                  </button>
                   <div className="spinner" />
                   <p>Loading your baseline…</p>
                 </div>

@@ -256,7 +256,7 @@ def _row(
 
 
 def _restorative_yield(nights: list[dict[str, Any]]) -> tuple[dict[str, Any], dict[str, Any]]:
-    title = "Restorative Yield per Hour Asleep"
+    title = "Restorative Yield per Hour in Bed"
     subtitle = "How much REM and deep sleep you get for each hour you spend in bed."
     methodology = (
         "Restorative yield is (REM + slow-wave minutes) ÷ hours in bed, night by night. "
@@ -292,7 +292,12 @@ def _restorative_yield(nights: list[dict[str, Any]]) -> tuple[dict[str, Any], di
                 progress=n,
                 progress_needed=YIELD_WINDOW,
             ),
-            {"series": series, "nights": n, "calibrating": True},
+            {
+                "series": series,
+                "nights": n,
+                "calibrating": True,
+                "meaning": _sentence(_calibrating_finding(n, YIELD_WINDOW, "restorative yield")),
+            },
         )
 
     window = series[-YIELD_WINDOW:]
@@ -390,7 +395,9 @@ def _stage_dependency(nights: list[dict[str, Any]]) -> tuple[dict[str, Any], dic
         "needed": STAGE_WINDOW,
         "calibrating": n < STAGE_WINDOW,
         "dominant": None,
-        "meaning": None,
+        "meaning": _sentence(_calibrating_finding(n, STAGE_WINDOW, "stage dependency"))
+        if n < STAGE_WINDOW
+        else None,
     }
     if n < STAGE_WINDOW:
         finding = _calibrating_finding(n, STAGE_WINDOW, "stage dependency")
@@ -530,22 +537,25 @@ def _hyperarousal(nights: list[dict[str, Any]]) -> tuple[dict[str, Any], dict[st
                 "nights": n,
                 "calibrating": True,
                 "drivers": [],
+                "meaning": _sentence(_calibrating_finding(n, CALIBRATING_NIGHTS, "hyperarousal")),
             },
         )
 
-    debts = np.array([p["debt_hours"] for p in points], float)
-    lats = np.array([p["latency_min"] for p in points], float)
+    window = points[-STAGE_WINDOW:]
+    n = len(window)
+    debts = np.array([p["debt_hours"] for p in window], float)
+    lats = np.array([p["latency_min"] for p in window], float)
     debt_cut = float(np.percentile(debts, HYPER_PERCENTILE))
     lat_cut = float(np.percentile(lats, HYPER_PERCENTILE))
     flagged_n = 0
-    for point in points:
+    for point in window:
         flag = point["debt_hours"] >= debt_cut and point["latency_min"] >= lat_cut
         point["flagged"] = flag
         if flag:
             flagged_n += 1
-    last = points[-1]
+    last = window[-1]
     last_flagged = bool(last["flagged"])
-    spark = [p["debt_hours"] * p["latency_min"] for p in points[-SPARKLINE_LEN:]]
+    spark = [p["debt_hours"] * p["latency_min"] for p in window[-SPARKLINE_LEN:]]
     finding = f"{flagged_n} flagged nights in {n}"
     if last_flagged:
         finding += (
@@ -558,8 +568,8 @@ def _hyperarousal(nights: list[dict[str, Any]]) -> tuple[dict[str, Any], dict[st
             f"{HYPER_PERCENTILE:.0f}th-percentile debt {debt_cut:.1f} h and latency {lat_cut:.0f} min"
         )
 
-    high_debt = sum(1 for p in points if p["debt_hours"] >= debt_cut)
-    long_lat = sum(1 for p in points if p["latency_min"] >= lat_cut)
+    high_debt = sum(1 for p in window if p["debt_hours"] >= debt_cut)
+    long_lat = sum(1 for p in window if p["latency_min"] >= lat_cut)
     drivers = [
         {"name": "High debt nights", "count": high_debt, "pct": _json_num(100.0 * high_debt / n)},
         {"name": "Long latency nights", "count": long_lat, "pct": _json_num(100.0 * long_lat / n)},
@@ -574,7 +584,7 @@ def _hyperarousal(nights: list[dict[str, Any]]) -> tuple[dict[str, Any], dict[st
                 "latency_min": _json_num(p["latency_min"]),
                 "flagged": p["flagged"],
             }
-            for p in points[-STAGE_WINDOW:]
+            for p in window
         ],
         "debt_threshold": _json_num(debt_cut),
         "latency_threshold": _json_num(lat_cut),
@@ -623,7 +633,7 @@ def _timing_regularity(nights: list[dict[str, Any]]) -> tuple[dict[str, Any], di
     subtitle = "Whether bedtime regularity or time asleep better tracks your next-morning HRV."
     methodology = (
         f"On your last {STAGE_WINDOW} nights, |sleep-midpoint shift vs your {PHASE_WINDOW}-night "
-        "mean| and hours asleep are each correlated with next-morning HRV. The ratio is "
+        "circular mean| and hours asleep are each correlated with next-morning HRV. The ratio is "
         "|r_timing| ÷ |r_duration|."
     )
     pairs = _timing_duration_pairs(nights)
@@ -641,7 +651,12 @@ def _timing_regularity(nights: list[dict[str, Any]]) -> tuple[dict[str, Any], di
                 progress=n,
                 progress_needed=STAGE_WINDOW,
             ),
-            {"nights": n, "calibrating": True, "ratio": None},
+            {
+                "nights": n,
+                "calibrating": True,
+                "ratio": None,
+                "meaning": _sentence(_calibrating_finding(n, STAGE_WINDOW, "timing vs duration")),
+            },
         )
 
     window = pairs[-STAGE_WINDOW:]
@@ -667,10 +682,21 @@ def _timing_regularity(nights: list[dict[str, Any]]) -> tuple[dict[str, Any], di
         )
 
     ratio = abs(r_t) / abs(r_d)
-    finding = (
-        f"timing explains {ratio:.1f}× more of your next-morning HRV link than duration "
-        f"across your last {STAGE_WINDOW} nights"
-    )
+    if abs(ratio - 1.0) < 0.05:
+        finding = (
+            f"timing and duration explain your next-morning HRV about equally "
+            f"across your last {STAGE_WINDOW} nights"
+        )
+    elif ratio > 1:
+        finding = (
+            f"timing explains {ratio:.1f}× as much of your next-morning HRV link as duration "
+            f"across your last {STAGE_WINDOW} nights"
+        )
+    else:
+        finding = (
+            f"duration explains {1.0 / ratio:.1f}× as much of your next-morning HRV link as timing "
+            f"across your last {STAGE_WINDOW} nights"
+        )
     spark = [p["shift_min"] for p in pairs[-SPARKLINE_LEN:]]
     read = _row(
         id="timing_regularity",
@@ -741,6 +767,7 @@ def _strain_sensitivity(nights: list[dict[str, Any]]) -> tuple[dict[str, Any], d
                 "trend_12w": trend,
                 "nights": n,
                 "calibrating": True,
+                "meaning": _sentence(_calibrating_finding(n, SLOPE_WINDOW, "strain sensitivity")),
             },
         )
 
@@ -858,7 +885,7 @@ def _cardiac_efficiency(workouts: list[dict[str, Any]]) -> tuple[dict[str, Any],
             matched = sorted(matched, key=lambda s: s["start"] or "")
             enabled = len(matched) >= CARDIAC_MIN_MATCHED
             if enabled:
-                half = max(CARDIAC_MIN_MATCHED // 2, 2)
+                half = max(len(matched) // 2, 2)
                 early = [float(s["average_heart_rate"]) for s in matched[:half]]
                 late = [float(s["average_heart_rate"]) for s in matched[-half:]]
                 delta = float(np.mean(late) - np.mean(early))
@@ -886,7 +913,9 @@ def _cardiac_efficiency(workouts: list[dict[str, Any]]) -> tuple[dict[str, Any],
     n_sessions = sum(s["sessions"] for s in sports_out)
     if not enabled_sports:
         finding = (
-            _calibrating_finding(n_sessions, CARDIAC_MIN_MATCHED, "cardiac efficiency")
+            _calibrating_finding(
+                n_sessions, CARDIAC_MIN_MATCHED, "cardiac efficiency", unit="sessions"
+            )
             if n_sessions < CARDIAC_MIN_MATCHED
             else "no sport yet has enough sessions inside ±8% of its own median kilojoule load"
         )
@@ -982,7 +1011,14 @@ def _adaptation_window(nights: list[dict[str, Any]]) -> tuple[dict[str, Any], di
                 progress=n,
                 progress_needed=CALIBRATING_NIGHTS,
             ),
-            {"days": [], "open": None, "status": None, "nights": n, "calibrating": True},
+            {
+                "days": [],
+                "open": None,
+                "status": None,
+                "nights": n,
+                "calibrating": True,
+                "meaning": _sentence(_calibrating_finding(n, CALIBRATING_NIGHTS, "adaptation window")),
+            },
         )
 
     median_rec = float(np.median([n["recovery"] for n in recovered[-21:]]))
@@ -1102,6 +1138,7 @@ def _runway(
                 "hrv_mean_90d": _json_num(hrv_mean_90d),
                 "slope_21d": None,
                 "calibrating": True,
+                "meaning": _sentence(_calibrating_finding(n, CALIBRATING_NIGHTS, "runway")),
             },
         )
 
@@ -1167,8 +1204,9 @@ def _circadian_phase(nights: list[dict[str, Any]]) -> tuple[dict[str, Any], dict
     subtitle = "How far last night's midpoint sat from your own 21-night midpoint, and the HRV cost of that shift."
     methodology = (
         f"Sleep midpoint is the local clock time halfway between sleep start and end. "
-        f"Drift is that midpoint minus your rolling {PHASE_WINDOW}-night mean. "
-        "Penalty is the HRV change associated with shift size on your own nights, binned."
+        f"The {PHASE_WINDOW}-night baseline is a circular mean, and drift unwraps across midnight "
+        "into ±12 hours. Penalty is the mean HRV delta in the shift-size bin last night fell into, "
+        "measured against your own nights."
     )
     with_mid = [n for n in nights if n.get("midpoint_hours") is not None and n.get("hrv") is not None]
     n = len(with_mid)
@@ -1185,7 +1223,13 @@ def _circadian_phase(nights: list[dict[str, Any]]) -> tuple[dict[str, Any], dict
                 progress=n,
                 progress_needed=PHASE_WINDOW,
             ),
-            {"calendar": [], "penalty_bars": [], "nights": n, "calibrating": True},
+            {
+                "calendar": [],
+                "penalty_bars": [],
+                "nights": n,
+                "calibrating": True,
+                "meaning": _sentence(_calibrating_finding(n, PHASE_WINDOW, "phase drift")),
+            },
         )
 
     shifts: list[dict[str, Any]] = []
@@ -1193,8 +1237,10 @@ def _circadian_phase(nights: list[dict[str, Any]]) -> tuple[dict[str, Any], dict
         window = with_mid[max(0, i - PHASE_WINDOW) : i]
         if len(window) < max(7, PHASE_WINDOW // 3):
             continue
-        mean_mid = float(np.mean([w["midpoint_hours"] for w in window]))
-        shift_min = (night["midpoint_hours"] - mean_mid) * 60.0
+        mean_mid = _circular_mean_hours([w["midpoint_hours"] for w in window])
+        if mean_mid is None:
+            continue
+        shift_min = _hour_shift(night["midpoint_hours"], mean_mid) * 60.0
         shifts.append(
             {
                 "date": night["date"],
@@ -1218,19 +1264,31 @@ def _circadian_phase(nights: list[dict[str, Any]]) -> tuple[dict[str, Any], dict
                 progress=len(shifts),
                 progress_needed=PHASE_WINDOW,
             ),
-            {"calendar": [], "penalty_bars": [], "nights": n, "calibrating": True},
+            {
+                "calendar": [],
+                "penalty_bars": [],
+                "nights": n,
+                "calibrating": True,
+                "meaning": _sentence(
+                    _calibrating_finding(len(shifts), PHASE_WINDOW, "phase drift")
+                ),
+            },
         )
 
     latest = shifts[-1]
-    mean_hrv = float(np.mean([s["hrv"] for s in shifts[-PHASE_WINDOW:]]))
-    penalty_latest = latest["hrv"] - mean_hrv
     bars = _penalty_by_shift(shifts)
+    penalty_latest = _penalty_for_shift(latest["shift_min"], bars)
     calendar = _phase_calendar(shifts[-CALENDAR_DAYS:])
     abs_shift = abs(latest["shift_min"])
     finding = (
         f"last night's midpoint sat {latest['shift_min']:+.0f} min from your "
-        f"{PHASE_WINDOW}-night mean, with morning HRV {penalty_latest:+.0f} ms versus that window"
+        f"{PHASE_WINDOW}-night circular mean"
     )
+    if penalty_latest is not None:
+        finding += (
+            f"; nights in that shift band average {penalty_latest:+.0f} ms HRV "
+            "versus your own mean"
+        )
     spark = [s["shift_min"] for s in shifts[-SPARKLINE_LEN:]]
     preview = {
         "kind": "heat",
@@ -1239,8 +1297,8 @@ def _circadian_phase(nights: list[dict[str, Any]]) -> tuple[dict[str, Any], dict
         "shift_min": _json_num(latest["shift_min"]),
     }
     meaning = (
-        "Shifts are versus your own rolling midpoint, not a clock-time ideal. "
-        "The bars show how morning HRV has moved with shift size on your nights."
+        "Shifts unwrap across midnight against your own circular midpoint, not a clock-time ideal. "
+        "The toll is the HRV delta for nights in the same shift-size band as last night."
     )
     read = _row(
         id="circadian_phase",
@@ -1282,7 +1340,8 @@ def _habit_persistence(nights: list[dict[str, Any]]) -> tuple[dict[str, Any], di
     subtitle = "How many mornings a consistent night still shows up in your HRV."
     methodology = (
         "Sleep-consistency percentage is lagged 0–7 days against next-morning HRV on your own nights. "
-        "Persistence is the last lag that keeps at least half of the lag-0 |correlation| and the same sign."
+        "Persistence is the longest prefix of lags that keep at least half of the lag-0 |correlation| "
+        "and the same sign."
     )
     pairs = [
         {"date": n["date"], "consistency": n.get("consistency"), "hrv": n.get("hrv")}
@@ -1303,7 +1362,13 @@ def _habit_persistence(nights: list[dict[str, Any]]) -> tuple[dict[str, Any], di
                 progress=n,
                 progress_needed=STAGE_WINDOW,
             ),
-            {"lags": [], "persistence_days": None, "nights": n, "calibrating": True},
+            {
+                "lags": [],
+                "persistence_days": None,
+                "nights": n,
+                "calibrating": True,
+                "meaning": _sentence(_calibrating_finding(n, STAGE_WINDOW, "habit persistence")),
+            },
         )
 
     cons = np.array([p["consistency"] for p in pairs], float)
@@ -1317,14 +1382,20 @@ def _habit_persistence(nights: list[dict[str, Any]]) -> tuple[dict[str, Any], di
         else:
             r = _pearson(cons[:-lag], hrv[lag:])
         lags.append({"lag": lag, "r": _json_num(r)})
-        if r is None:
-            continue
         if lag == 0:
             r0 = r
             persist = 0
             continue
-        if r0 is not None and abs(r0) > 1e-9 and (r * r0) > 0 and abs(r) >= 0.5 * abs(r0):
+        if (
+            r is not None
+            and r0 is not None
+            and abs(r0) > 1e-9
+            and (r * r0) > 0
+            and abs(r) >= 0.5 * abs(r0)
+        ):
             persist = lag
+        else:
+            break
     finding = (
         f"a consistent night still shows in your HRV for {persist} day"
         f"{'' if persist == 1 else 's'} on your last {n} mornings"
@@ -1383,7 +1454,13 @@ def _timing_contribution(nights: list[dict[str, Any]]) -> tuple[dict[str, Any], 
                 progress=n,
                 progress_needed=STAGE_WINDOW,
             ),
-            {"nights": n, "calibrating": True, "timing_pct": None, "duration_pct": None},
+            {
+                "nights": n,
+                "calibrating": True,
+                "timing_pct": None,
+                "duration_pct": None,
+                "meaning": _sentence(_calibrating_finding(n, STAGE_WINDOW, "timing contribution")),
+            },
         )
 
     window = pairs[-STAGE_WINDOW:]
@@ -1666,35 +1743,45 @@ def _timing_duration_pairs(nights: list[dict[str, Any]]) -> list[dict[str, Any]]
         window = with_mid[max(0, i - PHASE_WINDOW) : i]
         if len(window) < 7:
             continue
-        mean_mid = float(np.mean([w["midpoint_hours"] for w in window]))
+        mean_mid = _circular_mean_hours([w["midpoint_hours"] for w in window])
+        if mean_mid is None:
+            continue
         pairs.append(
             {
                 "date": night["date"],
                 "hrv": night["hrv"],
                 "asleep_hours": night["asleep_hours"],
-                "shift_min": abs(night["midpoint_hours"] - mean_mid) * 60.0,
+                "shift_min": abs(_hour_shift(night["midpoint_hours"], mean_mid)) * 60.0,
             }
         )
     return pairs
 
 
+_SHIFT_EDGES = [-180, -90, -45, -15, 15, 45, 90, 180]
+_SHIFT_LABELS = ["≤ −90", "−90 to −45", "−45 to −15", "−15 to +15", "+15 to +45", "+45 to +90", "≥ +90"]
+
+
+def _shift_bucket_index(shift_min: float) -> int | None:
+    if shift_min < _SHIFT_EDGES[0]:
+        return 0
+    for i in range(len(_SHIFT_LABELS)):
+        lo = _SHIFT_EDGES[i]
+        hi = _SHIFT_EDGES[i + 1]
+        if lo <= shift_min < hi or (i == len(_SHIFT_LABELS) - 1 and shift_min >= lo):
+            return i
+    return None
+
+
 def _penalty_by_shift(shifts: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    edges = [-180, -90, -45, -15, 15, 45, 90, 180]
-    labels = ["≤ −90", "−90 to −45", "−45 to −15", "−15 to +15", "+15 to +45", "+45 to +90", "≥ +90"]
-    buckets: list[list[float]] = [[] for _ in labels]
+    buckets: list[list[float]] = [[] for _ in _SHIFT_LABELS]
     mean_hrv = float(np.mean([s["hrv"] for s in shifts]))
     for item in shifts:
-        shift = item["shift_min"]
-        idx = None
-        for i in range(len(labels)):
-            if edges[i] <= shift < edges[i + 1] or (i == len(labels) - 1 and shift >= edges[i]):
-                idx = i
-                break
+        idx = _shift_bucket_index(item["shift_min"])
         if idx is None:
             continue
         buckets[idx].append(item["hrv"] - mean_hrv)
     out = []
-    for label, vals in zip(labels, buckets):
+    for label, vals in zip(_SHIFT_LABELS, buckets):
         out.append(
             {
                 "bucket": label,
@@ -1703,6 +1790,16 @@ def _penalty_by_shift(shifts: list[dict[str, Any]]) -> list[dict[str, Any]]:
             }
         )
     return out
+
+
+def _penalty_for_shift(shift_min: float, bars: list[dict[str, Any]]) -> float | None:
+    idx = _shift_bucket_index(shift_min)
+    if idx is None:
+        return None
+    bar = bars[idx] if idx < len(bars) else None
+    if not bar or bar.get("n", 0) <= 0:
+        return None
+    return _as_float(bar.get("penalty_ms"))
 
 
 def _phase_calendar(shifts: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -1725,8 +1822,34 @@ def _phase_calendar(shifts: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
-def _calibrating_finding(have: int, needed: int, label: str) -> str:
-    return f"{have} of {needed} nights — still calibrating {label} against your own history"
+def _calibrating_finding(have: int, needed: int, label: str, unit: str = "nights") -> str:
+    return f"{have} of {needed} {unit} — still calibrating {label} against your own history"
+
+
+def _sentence(text: str) -> str:
+    trimmed = text.strip()
+    if not trimmed:
+        return trimmed
+    capped = trimmed[0].upper() + trimmed[1:]
+    return capped if capped.endswith((".", "!", "?")) else f"{capped}."
+
+
+def _circular_mean_hours(hours: list[float]) -> float | None:
+    vals = [float(h) for h in hours if h is not None]
+    if not vals:
+        return None
+    angles = np.asarray(vals, float) * (2.0 * math.pi / 24.0)
+    sin_m = float(np.mean(np.sin(angles)))
+    cos_m = float(np.mean(np.cos(angles)))
+    if sin_m == 0.0 and cos_m == 0.0:
+        return None
+    mean_angle = math.atan2(sin_m, cos_m)
+    return float((mean_angle % (2.0 * math.pi)) * 24.0 / (2.0 * math.pi))
+
+
+def _hour_shift(mid: float, mean: float) -> float:
+    """Signed hours from mean to mid, wrapped into [-12, 12)."""
+    return ((mid - mean + 12.0) % 24.0) - 12.0
 
 
 # ---------------------------------------------------------------------------

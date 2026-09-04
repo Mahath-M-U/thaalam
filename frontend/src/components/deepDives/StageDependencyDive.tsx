@@ -52,13 +52,14 @@ export function StageDependencyDive({ read, dive, onBack }: Props) {
       title={read.title}
       subtitle={read.subtitle}
       meaning={dive.meaning}
+      finding={read.finding}
       methodology={read.methodology}
       onBack={onBack}
       hero={
         dive.calibrating || variance.length === 0 ? (
           <CalibratingNote progress={read.progress} needed={read.progress_needed} label="stage dependency" />
         ) : (
-          <ChartCard title="Variance explained" description="Unique association of each stage with your next-morning HRV, normalised to 100%.">
+          <ChartCard title="Share of the stage–HRV link" description="Absolute partial-correlation mass for each stage versus your next-morning HRV, normalised to 100%.">
             <div className="donut-wrap">
               <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
