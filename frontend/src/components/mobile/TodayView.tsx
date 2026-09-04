@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DailyBriefResponse, DerivedRead, RunwayResponse, VitalityResponse } from "../../types";
 import { rewriteTriScaleCopy } from "../../utils";
 import { Sparkline } from "../ReadsTable";
@@ -23,6 +23,8 @@ interface Props {
   onOpenRunway: () => void;
   onRefresh: () => void;
   syncing: boolean;
+  syncError?: string | null;
+  onVitalityOpenChange?: (open: boolean) => void;
 }
 
 export function TodayView({
@@ -35,13 +37,43 @@ export function TodayView({
   onOpenRunway,
   onRefresh,
   syncing,
+  syncError,
+  onVitalityOpenChange,
 }: Props) {
   const [vitalityOpen, setVitalityOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsRef = useRef<HTMLDivElement>(null);
   const signals = SIGNAL_IDS.map((id) => reads.find((row) => row.id === id)).filter(
     (row): row is DerivedRead => Boolean(row),
   );
   const flagged = reads.filter((row) => row.flagged && !row.calibrating);
+
+  useEffect(() => {
+    onVitalityOpenChange?.(vitalityOpen);
+    return () => onVitalityOpenChange?.(false);
+  }, [vitalityOpen, onVitalityOpenChange]);
+
+  useEffect(() => {
+    if (vitalityOpen) setSettingsOpen(false);
+  }, [vitalityOpen]);
+
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const onPointer = (event: PointerEvent) => {
+      if (!settingsRef.current?.contains(event.target as Node)) {
+        setSettingsOpen(false);
+      }
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSettingsOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointer);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointer);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [settingsOpen]);
 
   return (
     <div className="today-view">
@@ -50,18 +82,21 @@ export function TodayView({
           <div className="today-kicker">{formatDateKicker(brief?.date)}</div>
           <h1 className="today-wordmark">Thaalam</h1>
         </div>
-        <div className="today-settings-wrap">
+        <div className="today-settings-wrap" ref={settingsRef}>
           <button
             type="button"
             className="today-settings"
             aria-label="Settings"
+            aria-haspopup="menu"
             aria-expanded={settingsOpen}
+            aria-controls="today-settings-menu"
             onClick={() => setSettingsOpen((open) => !open)}
           >
             <SettingsIcon />
           </button>
           {settingsOpen ? (
-            <div className="today-settings-menu" role="menu">
+            <div className="today-settings-menu" id="today-settings-menu" role="menu">
+              {syncError ? <p className="today-settings-error">{syncError}</p> : null}
               <button
                 type="button"
                 role="menuitem"
@@ -71,7 +106,7 @@ export function TodayView({
                   onRefresh();
                 }}
               >
-                {syncing ? "Syncing…" : "Refresh data"}
+                {syncing ? "Syncing…" : syncError ? "Try again" : "Refresh data"}
               </button>
             </div>
           ) : null}

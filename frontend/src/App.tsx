@@ -76,6 +76,7 @@ export default function App() {
   const [diveStatus, setDiveStatus] = useState<"idle" | "loading" | "error">("idle");
   const [runway, setRunway] = useState<RunwayResponse | null>(null);
   const [runwayOpen, setRunwayOpen] = useState(false);
+  const [mobileModalOpen, setMobileModalOpen] = useState(false);
 
   const loadRunway = useCallback(async () => {
     try {
@@ -205,7 +206,15 @@ export default function App() {
 
   if (isMobile) {
     return (
-      <MobileShell tab={mobileTab} onTab={setMobileTabAndClear} overlay={readDive}>
+      <MobileShell
+        tab={mobileTab}
+        onTab={setMobileTabAndClear}
+        overlay={readDive}
+        hideNav={mobileModalOpen}
+        syncError={data ? syncError : null}
+        onRetry={() => void handleRefresh()}
+        syncing={syncing}
+      >
         {loading && !data ? (
           <div className="state-panel">
             <div className="spinner" />
@@ -238,6 +247,8 @@ export default function App() {
             onOpenRunway={() => setMobileTabAndClear("runway")}
             onRefresh={() => void handleRefresh()}
             syncing={syncing}
+            syncError={syncError}
+            onVitalityOpenChange={setMobileModalOpen}
           />
         )}
       </MobileShell>

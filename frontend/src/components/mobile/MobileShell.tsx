@@ -25,13 +25,44 @@ interface Props {
   onTab: (tab: MobileTab) => void;
   overlay?: ReactNode;
   children: ReactNode;
+  hideNav?: boolean;
+  syncError?: string | null;
+  onRetry?: () => void;
+  syncing?: boolean;
 }
 
-export function MobileShell({ tab, onTab, overlay, children }: Props) {
+export function MobileShell({
+  tab,
+  onTab,
+  overlay,
+  children,
+  hideNav = false,
+  syncError,
+  onRetry,
+  syncing = false,
+}: Props) {
+  const hasOverlay = overlay != null;
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [tab, hasOverlay]);
+
   return (
     <div className="mobile-shell">
-      <div className="mobile-body">{overlay ?? children}</div>
-      <BottomNav tab={tab} onTab={onTab} />
+      <div className="mobile-body">
+        {syncError ? (
+          <div className="mobile-sync-error" role="alert">
+            <p>{syncError}</p>
+            {onRetry ? (
+              <button type="button" className="btn" disabled={syncing} onClick={onRetry}>
+                {syncing ? "Syncing…" : "Try again"}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+        {overlay ?? children}
+      </div>
+      <BottomNav tab={tab} onTab={onTab} hidden={hideNav} />
     </div>
   );
 }

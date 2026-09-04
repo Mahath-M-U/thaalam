@@ -9,11 +9,17 @@ const TABS: { id: MobileTab; label: string; home?: boolean }[] = [
 interface Props {
   tab: MobileTab;
   onTab: (tab: MobileTab) => void;
+  hidden?: boolean;
 }
 
-export function BottomNav({ tab, onTab }: Props) {
+export function BottomNav({ tab, onTab, hidden = false }: Props) {
   return (
-    <nav className="bottom-nav" aria-label="Mobile">
+    <nav
+      className={`bottom-nav${hidden ? " is-hidden" : ""}`}
+      aria-label="Mobile"
+      aria-hidden={hidden || undefined}
+      inert={hidden || undefined}
+    >
       {TABS.map((item) => (
         <button
           key={item.id}

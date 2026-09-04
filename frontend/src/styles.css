@@ -807,13 +807,13 @@ code {
   font-size: 0.78rem;
 }
 
-@media (max-width: 960px) {
+@media (max-width: 959px) {
   .chart-grid > .wide {
     grid-column: auto;
   }
 }
 
-@media (max-width: 960px) {
+@media (max-width: 959px) {
   .app {
     grid-template-columns: 1fr;
   }
@@ -1231,7 +1231,7 @@ code {
   color: var(--muted-soft);
 }
 
-@media (max-width: 960px) {
+@media (max-width: 959px) {
   .vitality-dive-hero {
     grid-template-columns: 1fr;
   }
@@ -1599,7 +1599,7 @@ code {
   display: block;
 }
 
-@media (max-width: 960px) {
+@media (max-width: 959px) {
   .small-multiples {
     grid-template-columns: 1fr;
   }
@@ -1873,7 +1873,7 @@ code {
   line-height: 1.45;
 }
 
-@media (max-width: 960px) {
+@media (max-width: 959px) {
   .runway-card-header {
     flex-direction: column;
   }
@@ -1892,7 +1892,8 @@ code {
   width: 100%;
   max-width: 480px;
   margin: 0 auto;
-  padding: 1.05rem 1rem calc(5.25rem + env(safe-area-inset-bottom));
+  padding: calc(1.05rem + env(safe-area-inset-top)) calc(1rem + env(safe-area-inset-right))
+    calc(5.25rem + env(safe-area-inset-bottom)) calc(1rem + env(safe-area-inset-left));
 }
 
 .bottom-nav {
@@ -1906,6 +1907,37 @@ code {
   background: var(--canvas);
   border-top: 1px solid #1f1f1f;
   padding: 0.35rem 0.4rem calc(0.45rem + env(safe-area-inset-bottom));
+  padding-left: calc(0.4rem + env(safe-area-inset-left));
+  padding-right: calc(0.4rem + env(safe-area-inset-right));
+}
+
+.bottom-nav.is-hidden {
+  display: none;
+}
+
+.mobile-sync-error {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: var(--surface-card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 0.8rem 0.9rem;
+  margin-bottom: 0.85rem;
+}
+
+.mobile-sync-error p {
+  margin: 0;
+  color: var(--body);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.mobile-sync-error .btn {
+  flex-shrink: 0;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.8rem;
 }
 
 .bottom-nav button {
@@ -2015,6 +2047,14 @@ code {
 
 .today-settings-menu button:hover {
   background: var(--chrome);
+}
+
+.today-settings-error {
+  margin: 0 0 0.25rem;
+  padding: 0.35rem 0.7rem 0.15rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
 }
 
 .today-score {
@@ -2265,7 +2305,10 @@ code {
     width: 100%;
     min-height: 100dvh;
     border-radius: 0;
-    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+    padding-top: calc(1.15rem + env(safe-area-inset-top));
+    padding-left: calc(1.1rem + env(safe-area-inset-left));
+    padding-right: calc(1.1rem + env(safe-area-inset-right));
+    padding-bottom: calc(1.4rem + env(safe-area-inset-bottom));
   }
 
   .today-score-top {
