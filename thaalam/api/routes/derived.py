@@ -35,3 +35,33 @@ def get_vitality(
     from thaalam.services.vitality_score import build_vitality_payload
 
     return build_vitality_payload(con)
+
+
+@router.get("/reads")
+def get_reads(
+    con: duckdb.DuckDBPyConnection = Depends(get_readonly_connection),
+) -> dict[str, Any]:
+    from thaalam.services.reads_service import get_reads_payload
+
+    return get_reads_payload(con)
+
+
+@router.get("/reads/{read_id}")
+def get_read_dive(
+    read_id: str,
+    con: duckdb.DuckDBPyConnection = Depends(get_readonly_connection),
+) -> dict[str, Any]:
+    from thaalam.services.reads_service import READ_ORDER, get_read_dive_payload
+
+    if read_id not in READ_ORDER:
+        return {"present": False, "id": read_id, "read": None, "dive": None}
+    return get_read_dive_payload(con, read_id)
+
+
+@router.get("/runway")
+def get_runway(
+    con: duckdb.DuckDBPyConnection = Depends(get_readonly_connection),
+) -> dict[str, Any]:
+    from thaalam.services.reads_service import get_runway_payload
+
+    return get_runway_payload(con)

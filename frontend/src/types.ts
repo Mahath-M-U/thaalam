@@ -320,3 +320,108 @@ export interface VitalityResponse {
   supporting: VitalitySupporting | null;
 }
 
+export type ReadGroup = "sleep" | "load" | "rhythm";
+
+export interface DerivedRead {
+  id: string;
+  group: ReadGroup | string;
+  title: string;
+  finding: string;
+  value: number | null;
+  unit: string | null;
+  delta: number | null;
+  sparkline: number[];
+  flagged: boolean;
+  calibrating: boolean;
+  favourable?: boolean;
+  progress?: number | null;
+  progress_needed?: number | null;
+  methodology: string;
+  subtitle?: string | null;
+  preview?: Record<string, unknown> | null;
+}
+
+export interface DerivedReadsResponse {
+  present: boolean;
+  nights: number;
+  calibrating: boolean;
+  progress?: { nights: number; needed: number };
+  reads: DerivedRead[];
+}
+
+export interface DerivedReadDiveResponse {
+  present: boolean;
+  id: string;
+  read: DerivedRead | null;
+  dive: Record<string, unknown>;
+}
+
+export interface DerivedRunwayResponse {
+  present: boolean;
+  calibrating: boolean;
+  nights: number | null;
+  finding: string | null;
+  value: number | null;
+  unit: string | null;
+  sparkline: number[];
+  history: {
+    date: string;
+    hrv: number | null;
+    recovery: number | null;
+    strain: number | null;
+  }[];
+  hrv_mean_90d: number | null;
+  slope_21d: number | null;
+  methodology: string | null;
+}
+
+export interface SportEfficiencyDelta {
+  sport_name: string;
+  delta_bpm: number | null;
+  enabled: boolean;
+}
+
+export interface CardiacSportDive {
+  sport_id: number | null;
+  sport_name: string;
+  enabled: boolean;
+  sessions: number;
+  matched: number;
+  median_kj: number | null;
+  delta_bpm: number | null;
+  series: { date: string; hr: number | null; kilojoule: number | null }[];
+}
+
+export interface HyperarousalPoint {
+  date: string;
+  debt_hours: number | null;
+  latency_min: number | null;
+  flagged: boolean;
+}
+
+export interface StageVarianceSlice {
+  stage: string;
+  pct: number | null;
+  weight?: number | null;
+}
+
+export interface StrainScatterPoint {
+  date?: string;
+  strain: number | null;
+  hrv: number | null;
+}
+
+export interface PhaseCalendarCell {
+  date: string;
+  shift_min: number | null;
+  hrv: number | null;
+  weekday?: string | null;
+  iso_week?: number | null;
+}
+
+export interface PhasePenaltyBar {
+  bucket: string;
+  penalty_ms: number | null;
+  n: number;
+}
+

@@ -7,17 +7,26 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { SportStrain, WorkoutRecord } from "../../types";
+import type { SportEfficiencyDelta, SportStrain, WorkoutRecord } from "../../types";
 import { shortDate } from "../../utils";
 import { ChartCard } from "../ChartCard";
 import { CHART_COLORS, axisLine, axisTick, gridStroke, tooltipStyle } from "../../chartTheme";
 
 interface SportProps {
   sports: SportStrain[];
+  efficiencyDeltas?: SportEfficiencyDelta[];
+  onOpenRead?: (id: string) => void;
 }
 
-export function StrainBySportChart({ sports }: SportProps) {
-  const data = [...sports].reverse();
+export function StrainBySportChart({ sports, efficiencyDeltas, onOpenRead }: SportProps) {
+  const deltas = new Map((efficiencyDeltas ?? []).map((d) => [d.sport_name.toLowerCase(), d]));
+  const data = [...sports].reverse().map((sport) => {
+    const delta = deltas.get(sport.sport_name.toLowerCase());
+    return {
+      ...sport,
+      efficiency_delta_bpm: delta?.enabled ? delta.delta_bpm : null,
+    };
+  });
 
   if (data.length === 0) {
     return (
@@ -30,7 +39,7 @@ export function StrainBySportChart({ sports }: SportProps) {
   return (
     <ChartCard
       title="Average strain by sport"
-      description="Mean workout strain grouped by activity type."
+      description="Mean workout strain grouped by activity type, with matched-load heart-rate drift where you have enough sessions."
     >
       <ResponsiveContainer width="100%" height={Math.max(220, data.length * 28)}>
         <BarChart
@@ -57,6 +66,31 @@ export function StrainBySportChart({ sports }: SportProps) {
           <Bar dataKey="avg_strain" name="Avg strain" fill={CHART_COLORS.amber} radius={[0, 4, 4, 0]} />
         </BarChart>
       </ResponsiveContainer>
+      {efficiencyDeltas && efficiencyDeltas.some((d) => d.enabled && d.delta_bpm != null) ? (
+        <ul className="sport-efficiency">
+          {efficiencyDeltas
+            .filter((d) => d.enabled && d.delta_bpm != null)
+            .map((d) => (
+              <li key={d.sport_name}>
+                <button
+                  type="button"
+                  className="linkish"
+                  onClick={() => onOpenRead?.("cardiac_efficiency")}
+                >
+                  {d.sport_name}
+                  <span>
+                    {d.delta_bpm != null && d.delta_bpm > 0 ? "+" : ""}
+                    {d.delta_bpm?.toFixed(0)} bpm
+                  </span>
+                </button>
+              </li>
+            ))}
+        </ul>
+      ) : null}
+      <p className="chart-footnote">
+        Efficiency delta is average heart rate drift on sessions within ±8% of that sport's own median
+        kilojoule load, versus your earlier matched sessions.
+      </p>
     </ChartCard>
   );
 }
@@ -124,6 +158,7 @@ export function WorkoutFrequencyChart({ workouts }: FreqProps) {
           <Bar dataKey="count" name="Workouts" fill={CHART_COLORS.amber} radius={[4, 4, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
+      <p className="chart-footnote">Weekly counts from your logged workouts in the selected range.</p>
     </ChartCard>
   );
 }

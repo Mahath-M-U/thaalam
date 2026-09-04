@@ -208,6 +208,38 @@ _SCHEMA_STATEMENTS = [
         PRIMARY KEY (user_id, score_date)
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS derived_reads (
+        user_id BIGINT,
+        read_id VARCHAR,
+        computed_at TIMESTAMP,
+        group_name VARCHAR,
+        title VARCHAR,
+        finding VARCHAR,
+        value DOUBLE,
+        unit VARCHAR,
+        delta DOUBLE,
+        sparkline VARCHAR,
+        flagged BOOLEAN,
+        calibrating BOOLEAN,
+        favourable BOOLEAN,
+        progress INTEGER,
+        progress_needed INTEGER,
+        methodology VARCHAR,
+        subtitle VARCHAR,
+        preview VARCHAR,
+        PRIMARY KEY (user_id, read_id)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS derived_read_dives (
+        user_id BIGINT,
+        read_id VARCHAR,
+        computed_at TIMESTAMP,
+        payload VARCHAR,
+        PRIMARY KEY (user_id, read_id)
+    )
+    """,
 ]
 
 
@@ -559,6 +591,162 @@ def record_derived_recompute(
             _as_json(details),
         ],
     )
+
+
+def replace_derived_reads(
+    con: duckdb.DuckDBPyConnection,
+    user_id: int,
+    reads: list[dict[str, Any]],
+    dives: dict[str, Any],
+    computed_at: datetime,
+) -> None:
+    """Replace stored eleven-read rows and deep-dive payloads for one user."""
+    con.execute("DELETE FROM derived_reads WHERE user_id = ?", [user_id])
+    con.execute("DELETE FROM derived_read_dives WHERE user_id = ?", [user_id])
+    if reads:
+        rows = []
+        for read in reads:
+            rows.append(
+                (
+                    user_id,
+                    read.get("id"),
+                    computed_at,
+                    read.get("group"),
+                    read.get("title"),
+                    read.get("finding"),
+                    read.get("value"),
+                    read.get("unit"),
+                    read.get("delta"),
+                    _as_json(read.get("sparkline") or []),
+                    bool(read.get("flagged")),
+                    bool(read.get("calibrating")),
+                    bool(read.get("favourable", True)),
+                    read.get("progress"),
+                    read.get("progress_needed"),
+                    read.get("methodology"),
+                    read.get("subtitle"),
+                    _as_json(read.get("preview")),
+                )
+            )
+        _upsert(
+            con,
+            "derived_reads",
+            [
+                "user_id",
+                "read_id",
+                "computed_at",
+                "group_name",
+                "title",
+                "finding",
+                "value",
+                "unit",
+                "delta",
+                "sparkline",
+                "flagged",
+                "calibrating",
+                "favourable",
+                "progress",
+                "progress_needed",
+                "methodology",
+                "subtitle",
+                "preview",
+            ],
+            rows,
+        )
+    if dives:
+        dive_rows = [
+            (user_id, read_id, computed_at, payload if isinstance(payload, str) else _as_json(payload))
+            for read_id, payload in dives.items()
+        ]
+        _upsert(
+            con,
+            "derived_read_dives",
+            ["user_id", "read_id", "computed_at", "payload"],
+            dive_rows,
+        )
+
+
+def _parse_stored_json(raw: Any) -> Any:
+    if raw is None:
+        return None
+    if not isinstance(raw, str):
+        return raw
+    try:
+        return json.loads(raw)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None
+
+
+def list_derived_reads(
+    con: duckdb.DuckDBPyConnection, user_id: int | None = None
+) -> list[dict[str, Any]]:
+    sql = """
+        SELECT user_id, read_id, computed_at, group_name, title, finding,
+               value, unit, delta, sparkline, flagged, calibrating, favourable,
+               progress, progress_needed, methodology, subtitle, preview
+        FROM derived_reads
+    """
+    params: list[Any] = []
+    if user_id is not None:
+        sql += " WHERE user_id = ?"
+        params.append(user_id)
+    sql += " ORDER BY read_id"
+    rows = con.execute(sql, params).fetchall()
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        sparkline = _parse_stored_json(row[9])
+        if not isinstance(sparkline, list):
+            sparkline = []
+        out.append(
+            {
+                "user_id": row[0],
+                "id": row[1],
+                "computed_at": row[2],
+                "group": row[3],
+                "title": row[4],
+                "finding": row[5],
+                "value": row[6],
+                "unit": row[7],
+                "delta": row[8],
+                "sparkline": sparkline,
+                "flagged": bool(row[10]) if row[10] is not None else False,
+                "calibrating": bool(row[11]) if row[11] is not None else False,
+                "favourable": bool(row[12]) if row[12] is not None else True,
+                "progress": row[13],
+                "progress_needed": row[14],
+                "methodology": row[15],
+                "subtitle": row[16],
+                "preview": _parse_stored_json(row[17]),
+            }
+        )
+    return out
+
+
+def get_derived_read_dive(
+    con: duckdb.DuckDBPyConnection,
+    read_id: str,
+    user_id: int | None = None,
+) -> dict[str, Any] | None:
+    sql = """
+        SELECT user_id, read_id, computed_at, payload
+        FROM derived_read_dives
+        WHERE read_id = ?
+    """
+    params: list[Any] = [read_id]
+    if user_id is not None:
+        sql += " AND user_id = ?"
+        params.append(user_id)
+    sql += " LIMIT 1"
+    row = con.execute(sql, params).fetchone()
+    if row is None:
+        return None
+    payload = _parse_stored_json(row[3])
+    return {
+        "user_id": row[0],
+        "id": row[1],
+        "computed_at": row[2],
+        "payload": payload if isinstance(payload, dict) else {},
+    }
 
 
 def upsert_workouts(con: duckdb.DuckDBPyConnection, workouts: list[dict[str, Any]]) -> None:
