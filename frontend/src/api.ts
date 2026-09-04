@@ -7,6 +7,7 @@ import type {
   ProfileResponse,
   RecordsResponse,
   RecoveryRecord,
+  RunwayResponse,
   SleepRecord,
   SleepStage,
   SportStrain,
@@ -45,4 +46,5 @@ export const api = {
   briefExplain: (question: string) =>
     requestJson<BriefExplainerResponse>(`/api/brief/explain?question=${encodeURIComponent(question)}`),
   sync: () => requestJson<{ ok: boolean }>("/api/sync", { method: "POST" }),
+  derivedRunway: () => requestJson<RunwayResponse>("/api/derived/runway"),
 };

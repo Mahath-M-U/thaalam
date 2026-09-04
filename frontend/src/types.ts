@@ -280,3 +280,45 @@ export interface BriefExplainerResponse {
   answer: string;
 }
 
+export interface RunwayHistoryPoint {
+  date: string;
+  value: number;
+}
+
+export interface RunwayProjectionPoint {
+  date: string;
+  yhat: number;
+  lo: number;
+  hi: number;
+}
+
+export interface RunwaySpend {
+  label: string;
+  pct: number;
+  note: string;
+}
+
+export interface RunwayAdaptationWindow {
+  state: string;
+  cells: number[];
+  copy: string;
+}
+
+export interface RunwayResponse {
+  present: boolean;
+  calibrating: boolean;
+  headline: string | null;
+  subtitle: string | null;
+  history: RunwayHistoryPoint[];
+  projection: RunwayProjectionPoint[];
+  baseline: number | null;
+  baseline_break_date: string | null;
+  days_remaining: number | null;
+  cone_pct: number;
+  spend: RunwaySpend[];
+  adaptation_window: RunwayAdaptationWindow | null;
+  methodology: string | null;
+  what_it_means: string | null;
+  cta: string | null;
+}
+

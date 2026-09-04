@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { HrvRhrChart } from "./components/charts/HrvRhrChart";
 import { RecoveryChart } from "./components/charts/RecoveryChart";
 import { SleepStagesChart } from "./components/charts/SleepStagesChart";
@@ -11,12 +11,14 @@ import {
   WorkoutFrequencyChart,
 } from "./components/charts/WorkoutCharts";
 import { InsightsPanel } from "./components/InsightsPanel";
+import { RunwayCard } from "./components/RunwayCard";
 import { Section } from "./components/Section";
 import { SleepDetailTable } from "./components/SleepDetailTable";
 import { StatCards } from "./components/StatCards";
+import { RunwayDive } from "./components/deepDives/RunwayDive";
 import { api } from "./api";
 import { useDashboardData } from "./hooks/useDashboardData";
-import type { SectionId } from "./types";
+import type { RunwayResponse, SectionId } from "./types";
 import {
   DEFAULT_RANGE_DAYS,
   filterByDays,
@@ -39,6 +41,21 @@ export default function App() {
   const [rangeDays, setRangeDays] = useState<RangeDays>(DEFAULT_RANGE_DAYS);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [runway, setRunway] = useState<RunwayResponse | null>(null);
+  const [runwayOpen, setRunwayOpen] = useState(false);
+
+  const loadRunway = useCallback(async () => {
+    try {
+      setRunway(await api.derivedRunway());
+    } catch {
+      setRunway(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (loading) return;
+    void loadRunway();
+  }, [loading, data, loadRunway]);
 
   const handleRefresh = async () => {
     setSyncing(true);
@@ -46,6 +63,7 @@ export default function App() {
     try {
       await api.sync();
       await reload();
+      await loadRunway();
     } catch (err) {
       setSyncError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -165,6 +183,10 @@ export default function App() {
           </div>
         </header>
 
+        <div className="score-runway-row">
+          <RunwayCard runway={runway} onOpen={() => setRunwayOpen(true)} />
+        </div>
+
         {loading && (
           <div className="state-panel">
             <div className="spinner" />
@@ -235,6 +257,9 @@ export default function App() {
           </>
         )}
       </main>
+      {runwayOpen && runway && (
+        <RunwayDive runway={runway} onClose={() => setRunwayOpen(false)} />
+      )}
     </div>
   );
 }
