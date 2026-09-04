@@ -17,15 +17,13 @@ function hoursLabel(h: number | null | undefined): string {
 
 export function SleepDetailTable({ records }: Props) {
   const [showNaps, setShowNaps] = useState(false);
-  const [limit, setLimit] = useState(21);
 
   const rows = useMemo(() => {
     return [...records]
       .filter((r) => (showNaps ? true : !r.nap))
       .filter((r) => r.start)
-      .sort((a, b) => String(b.start).localeCompare(String(a.start)))
-      .slice(0, limit);
-  }, [records, showNaps, limit]);
+      .sort((a, b) => String(b.start).localeCompare(String(a.start)));
+  }, [records, showNaps]);
 
   const latest = rows[0];
 
@@ -127,18 +125,6 @@ export function SleepDetailTable({ records }: Props) {
           />
           Show naps
         </label>
-        <div className="limit-btns">
-          {[14, 21, 45, 90].map((n) => (
-            <button
-              key={n}
-              type="button"
-              className={limit === n ? "active" : ""}
-              onClick={() => setLimit(n)}
-            >
-              {n}d
-            </button>
-          ))}
-        </div>
       </div>
 
       <div className="table-scroll">

@@ -65,7 +65,7 @@ export function SleepTrendsChart({ records }: Props) {
             type="monotone"
             dataKey="performance"
             name="Performance"
-            stroke={CHART_COLORS.strain}
+            stroke={CHART_COLORS.amber}
             strokeWidth={2}
             dot={false}
             connectNulls
@@ -74,7 +74,7 @@ export function SleepTrendsChart({ records }: Props) {
             type="monotone"
             dataKey="efficiency"
             name="Efficiency"
-            stroke={CHART_COLORS.recovery}
+            stroke={CHART_COLORS.hrv}
             strokeWidth={2}
             dot={false}
             connectNulls
@@ -83,7 +83,7 @@ export function SleepTrendsChart({ records }: Props) {
             type="monotone"
             dataKey="consistency"
             name="Consistency"
-            stroke={CHART_COLORS.amber}
+            stroke={CHART_COLORS.sleep}
             strokeWidth={2}
             dot={false}
             connectNulls

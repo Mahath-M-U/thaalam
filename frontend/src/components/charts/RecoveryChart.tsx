@@ -2,16 +2,16 @@ import {
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceArea,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
-  ReferenceArea,
 } from "recharts";
 import type { RecoveryRecord } from "../../types";
-import { recoveryColor, shortDate } from "../../utils";
+import { shortDate } from "../../utils";
 import { ChartCard } from "../ChartCard";
-import { CHART_COLORS, axisLine, axisTick, gridStroke, tooltipStyle } from "../../chartTheme";
+import { AMBER, axisLine, axisTick, CHART_COLORS, gridStroke, tooltipStyle } from "../../chartTheme";
 
 interface Props {
   records: RecoveryRecord[];
@@ -24,7 +24,6 @@ export function RecoveryChart({ records }: Props) {
       date: r.cycle_start!,
       label: shortDate(r.cycle_start),
       score: r.recovery_score as number,
-      color: recoveryColor(r.recovery_score),
     }));
 
   if (data.length === 0) {
@@ -38,14 +37,12 @@ export function RecoveryChart({ records }: Props) {
   return (
     <ChartCard
       title="Recovery score over time"
-      description="Daily recovery (0–100) with red / yellow / green bands."
+      description="Daily recovery (0–100) with an amber own-band wash."
       wide
     >
       <ResponsiveContainer width="100%" height={280}>
         <LineChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-          <ReferenceArea y1={0} y2={34} fill={CHART_COLORS.recoveryLow} fillOpacity={0.07} />
-          <ReferenceArea y1={34} y2={67} fill={CHART_COLORS.recoveryMid} fillOpacity={0.07} />
-          <ReferenceArea y1={67} y2={100} fill={CHART_COLORS.recoveryHigh} fillOpacity={0.07} />
+          <ReferenceArea y1={0} y2={100} fill={AMBER} fillOpacity={0.08} />
           <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
           <XAxis
             dataKey="label"
@@ -76,7 +73,7 @@ export function RecoveryChart({ records }: Props) {
             stroke={CHART_COLORS.neutral}
             strokeWidth={1.5}
             dot={(props) => {
-              const { cx, cy, payload, index } = props;
+              const { cx, cy, index } = props;
               if (cx == null || cy == null) return <g key={index} />;
               return (
                 <circle
@@ -84,13 +81,13 @@ export function RecoveryChart({ records }: Props) {
                   cx={cx}
                   cy={cy}
                   r={3.5}
-                  fill={payload.color}
-                  stroke="#ffffff"
+                  fill={AMBER}
+                  stroke="#1A1A1A"
                   strokeWidth={1}
                 />
               );
             }}
-            activeDot={{ r: 5 }}
+            activeDot={{ r: 5, fill: AMBER }}
           />
         </LineChart>
       </ResponsiveContainer>

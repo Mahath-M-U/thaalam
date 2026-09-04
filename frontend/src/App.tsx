@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { HrvRhrChart } from "./components/charts/HrvRhrChart";
 import { RecoveryChart } from "./components/charts/RecoveryChart";
 import { SleepStagesChart } from "./components/charts/SleepStagesChart";
@@ -16,7 +16,12 @@ import { SleepDetailTable } from "./components/SleepDetailTable";
 import { StatCards } from "./components/StatCards";
 import { useDashboardData } from "./hooks/useDashboardData";
 import type { SectionId } from "./types";
-import { CHART_COLORS } from "./chartTheme";
+import {
+  DEFAULT_RANGE_DAYS,
+  filterByDays,
+  RANGE_OPTIONS,
+  type RangeDays,
+} from "./utils";
 
 const NAV: { id: SectionId; label: string }[] = [
   { id: "overview", label: "Overview" },
@@ -30,11 +35,36 @@ const NAV: { id: SectionId; label: string }[] = [
 export default function App() {
   const { data, loading, error, reload } = useDashboardData();
   const [section, setSection] = useState<SectionId>("overview");
+  const [rangeDays, setRangeDays] = useState<RangeDays>(DEFAULT_RANGE_DAYS);
 
   const name =
     data?.profile.profile.first_name ||
     data?.profile.profile.email ||
     "Athlete";
+
+  const recovery = useMemo(
+    () => (data ? filterByDays(data.recovery, (r) => r.cycle_start, rangeDays) : []),
+    [data, rangeDays],
+  );
+  const cycles = useMemo(
+    () => (data ? filterByDays(data.cycles, (r) => r.start, rangeDays) : []),
+    [data, rangeDays],
+  );
+  const daily = useMemo(
+    () => (data ? filterByDays(data.daily, (r) => r.cycle_start, rangeDays) : []),
+    [data, rangeDays],
+  );
+  const sleep = useMemo(
+    () => (data ? filterByDays(data.sleep, (r) => r.start, rangeDays) : []),
+    [data, rangeDays],
+  );
+  const workouts = useMemo(
+    () => (data ? filterByDays(data.workouts, (r) => r.start, rangeDays) : []),
+    [data, rangeDays],
+  );
+
+  const nightCount = data?.sleep.filter((s) => !s.nap).length ?? 0;
+  const sessionCount = data?.workouts.length ?? 0;
 
   return (
     <div className="app">
@@ -43,7 +73,7 @@ export default function App() {
           <span className="brand-mark">Θ</span>
           <div>
             <strong>Thaalam</strong>
-            <small>WHOOP dashboard</small>
+            <small>WHOOP</small>
           </div>
         </div>
 
@@ -52,7 +82,7 @@ export default function App() {
             <button
               key={item.id}
               type="button"
-              className={section === item.id ? "active" : ""}
+              className={`${section === item.id ? "active" : ""}${item.id === "overview" ? " nav-home" : ""}`.trim()}
               onClick={() => {
                 setSection(item.id);
                 document.getElementById(item.id)?.scrollIntoView({ behavior: "smooth" });
@@ -67,6 +97,13 @@ export default function App() {
           <button type="button" className="btn ghost" onClick={() => void reload()}>
             Refresh data
           </button>
+          <div className="baseline-card">
+            <div className="baseline-kicker">Your baseline</div>
+            <p>
+              {nightCount} {nightCount === 1 ? "night" : "nights"} and {sessionCount}{" "}
+              {sessionCount === 1 ? "session" : "sessions"} of your own data
+            </p>
+          </div>
           <p className="muted">
             API on <code>:8000</code>
             <br />
@@ -84,17 +121,31 @@ export default function App() {
               synced history.
             </p>
           </div>
-          {data?.profile.body_measurement.max_heart_rate != null && (
-            <div className="pill">
-              Max HR {data.profile.body_measurement.max_heart_rate} bpm
+          <div className="topbar-actions">
+            <div className="range-chips" role="group" aria-label="Date range">
+              {RANGE_OPTIONS.map((days) => (
+                <button
+                  key={days}
+                  type="button"
+                  className={`chip${rangeDays === days ? " active" : ""}`}
+                  onClick={() => setRangeDays(days)}
+                >
+                  {days}d
+                </button>
+              ))}
             </div>
-          )}
+            {data?.profile.body_measurement.max_heart_rate != null && (
+              <div className="pill">
+                Max HR {data.profile.body_measurement.max_heart_rate} bpm
+              </div>
+            )}
+          </div>
         </header>
 
         {loading && (
           <div className="state-panel">
             <div className="spinner" />
-            <p>Loading dashboard…</p>
+            <p>Loading your baseline…</p>
           </div>
         )}
 
@@ -118,27 +169,35 @@ export default function App() {
               <StatCards stats={data.summary.stats} latest={data.summary.latest} />
             </div>
 
-            <InsightsPanel insights={data.insights} dailyBrief={data.dailyBrief} />
+            <InsightsPanel
+              insights={data.insights}
+              dailyBrief={data.dailyBrief}
+              rangeDays={rangeDays}
+            />
 
-            <Section id="recovery" title="Recovery" accent={CHART_COLORS.recovery}>
-              <RecoveryChart records={data.recovery} />
-              <HrvRhrChart records={data.recovery} />
+            <Section id="recovery" title="Recovery">
+              <RecoveryChart records={recovery} />
+              <HrvRhrChart records={recovery} />
             </Section>
 
-            <Section id="strain" title="Strain" accent={CHART_COLORS.strain}>
-              <StrainChart records={data.cycles} />
-              <StrainVsRecovery records={data.daily} />
+            <Section id="strain" title="Strain">
+              <StrainChart records={cycles} />
+              <StrainVsRecovery records={daily} />
             </Section>
 
-            <Section id="sleep" title="Sleep" accent={CHART_COLORS.sleep}>
-              <SleepTrendsChart records={data.sleep} />
+            <Section id="sleep" title="Sleep">
+              <SleepTrendsChart records={sleep} />
               <SleepStagesChart stages={data.sleepStages} />
-              <SleepVsRecoveryChart daily={data.daily} insights={data.insights} />
-              <SleepDetailTable records={data.sleep} />
+              <SleepVsRecoveryChart
+                daily={daily}
+                insights={data.insights}
+                rangeDays={rangeDays}
+              />
+              <SleepDetailTable records={sleep} />
             </Section>
 
-            <Section id="workouts" title="Workouts" accent={CHART_COLORS.amber}>
-              <WorkoutFrequencyChart workouts={data.workouts} />
+            <Section id="workouts" title="Workouts">
+              <WorkoutFrequencyChart workouts={workouts} />
               <StrainBySportChart sports={data.sports} />
             </Section>
 

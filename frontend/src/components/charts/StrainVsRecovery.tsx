@@ -66,7 +66,7 @@ export function StrainVsRecovery({ records }: Props) {
             formatter={(value, name) => [value, name]}
             labelFormatter={() => ""}
           />
-          <Scatter data={data} fill={CHART_COLORS.strain} fillOpacity={0.75} />
+          <Scatter data={data} fill={CHART_COLORS.neutral} fillOpacity={0.85} />
         </ScatterChart>
       </ResponsiveContainer>
     </ChartCard>

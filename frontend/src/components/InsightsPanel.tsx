@@ -6,6 +6,7 @@ import {
   Legend,
   Line,
   LineChart,
+  ReferenceArea,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -13,21 +14,30 @@ import {
   YAxis,
 } from "recharts";
 import type { InsightsResponse, DailyBriefResponse } from "../types";
-import { shortDate } from "../utils";
+import { isWithinDays, shortDate } from "../utils";
 import { ChartCard } from "./ChartCard";
 import { DailyBriefCard } from "./DailyBriefCard";
 import { Section } from "./Section";
-import { CHART_COLORS, axisLine, axisTick, gridStroke, legendStyle, tooltipStyle } from "../chartTheme";
+import {
+  CHART_COLORS,
+  axisLine,
+  axisTick,
+  gridStroke,
+  guideStroke,
+  legendStyle,
+  tooltipStyle,
+} from "../chartTheme";
 
 interface Props {
   insights: InsightsResponse;
   dailyBrief: DailyBriefResponse;
+  rangeDays?: number;
 }
 
-export function InsightsPanel({ insights, dailyBrief }: Props) {
+export function InsightsPanel({ insights, dailyBrief, rangeDays }: Props) {
   if (!insights.ready) {
     return (
-      <Section id="insights" title="Insights" accent={CHART_COLORS.rose}>
+      <Section id="insights" title="Insights">
         <DailyBriefCard brief={dailyBrief} />
         <ChartCard title="Derived insights">
           <p className="empty-chart">{insights.message ?? "Not enough data yet."}</p>
@@ -37,28 +47,37 @@ export function InsightsPanel({ insights, dailyBrief }: Props) {
   }
 
   const sections = insights.sections ?? {};
-  const hrvSeries = (sections.hrv?.series ?? []).map((r) => ({
-    ...r,
-    label: shortDate(r.date),
-  }));
-  const acwrSeries = (sections.training_load?.series ?? []).map((r) => ({
-    ...r,
-    label: shortDate(r.date),
-  }));
-  const sleepDebtSeries = (sections.sleep_debt?.series ?? []).map((r) => ({
-    ...r,
-    label: shortDate(r.date),
-  }));
+  const inWindow = (iso: string) => (rangeDays == null ? true : isWithinDays(iso, rangeDays));
+  const hrvSeries = (sections.hrv?.series ?? [])
+    .filter((r) => inWindow(r.date))
+    .map((r) => ({
+      ...r,
+      label: shortDate(r.date),
+    }));
+  const acwrSeries = (sections.training_load?.series ?? [])
+    .filter((r) => inWindow(r.date))
+    .map((r) => ({
+      ...r,
+      label: shortDate(r.date),
+    }));
+  const sleepDebtSeries = (sections.sleep_debt?.series ?? [])
+    .filter((r) => inWindow(r.date))
+    .map((r) => ({
+      ...r,
+      label: shortDate(r.date),
+    }));
   const weekday = sections.weekday_patterns?.by_weekday ?? [];
   const lagBuckets = sections.strain_recovery_lag?.buckets ?? [];
   const zonePct = sections.recovery_zones?.percentages;
-  const rolling = (sections.rolling?.series ?? []).map((r) => ({
-    ...r,
-    label: shortDate(r.date),
-  }));
+  const rolling = (sections.rolling?.series ?? [])
+    .filter((r) => inWindow(r.date))
+    .map((r) => ({
+      ...r,
+      label: shortDate(r.date),
+    }));
 
   return (
-    <Section id="insights" title="Derived insights" accent={CHART_COLORS.rose}>
+    <Section id="insights" title="Derived insights">
       <DailyBriefCard brief={dailyBrief} />
 
       <div className="insight-meta wide">
@@ -122,7 +141,7 @@ export function InsightsPanel({ insights, dailyBrief }: Props) {
                 type="monotone"
                 dataKey="baseline"
                 name="30d baseline"
-                stroke={CHART_COLORS.neutral}
+                stroke={CHART_COLORS.amber}
                 strokeWidth={2}
                 strokeDasharray="5 5"
                 dot={false}
@@ -156,9 +175,10 @@ export function InsightsPanel({ insights, dailyBrief }: Props) {
                 domain={["auto", "auto"]}
               />
               <Tooltip contentStyle={tooltipStyle} />
-              <ReferenceLine y={0.8} stroke={CHART_COLORS.neutral} strokeDasharray="3 3" />
-              <ReferenceLine y={1.3} stroke={CHART_COLORS.amber} strokeDasharray="3 3" />
-              <ReferenceLine y={1.5} stroke={CHART_COLORS.recoveryLow} strokeDasharray="3 3" />
+              <ReferenceArea y1={1.3} y2={1.5} fill={CHART_COLORS.amber} fillOpacity={0.07} />
+              <ReferenceLine y={0.8} stroke={guideStroke} strokeDasharray="3 3" />
+              <ReferenceLine y={1.3} stroke={guideStroke} strokeDasharray="3 3" />
+              <ReferenceLine y={1.5} stroke={guideStroke} strokeDasharray="3 3" />
               <Line
                 type="monotone"
                 dataKey="acwr"
@@ -208,14 +228,14 @@ export function InsightsPanel({ insights, dailyBrief }: Props) {
       {zonePct && (
         <ChartCard
           title="Recovery zone mix"
-          description="Share of days in WHOOP-style red / yellow / green bands."
+          description="Share of days in low / moderate / high recovery bands."
         >
           <ResponsiveContainer width="100%" height={260}>
             <BarChart
               data={[
-                { zone: "Red", pct: zonePct.red, fill: CHART_COLORS.recoveryLow },
-                { zone: "Yellow", pct: zonePct.yellow, fill: CHART_COLORS.recoveryMid },
-                { zone: "Green", pct: zonePct.green, fill: CHART_COLORS.recoveryHigh },
+                { zone: "Low", pct: zonePct.red, fill: CHART_COLORS.recoveryLow },
+                { zone: "Moderate", pct: zonePct.yellow, fill: CHART_COLORS.recoveryMid },
+                { zone: "High", pct: zonePct.green, fill: CHART_COLORS.recoveryHigh },
               ]}
               margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
             >
@@ -243,15 +263,15 @@ export function InsightsPanel({ insights, dailyBrief }: Props) {
           </ResponsiveContainer>
           <ul className="stage-legend">
             <li>
-              <span className="swatch" style={{ background: CHART_COLORS.recoveryLow }} /> Red{" "}
+              <span className="swatch" style={{ background: CHART_COLORS.recoveryLow }} /> Low{" "}
               <em>{zonePct.red}%</em>
             </li>
             <li>
-              <span className="swatch" style={{ background: CHART_COLORS.recoveryMid }} /> Yellow{" "}
+              <span className="swatch" style={{ background: CHART_COLORS.recoveryMid }} /> Moderate{" "}
               <em>{zonePct.yellow}%</em>
             </li>
             <li>
-              <span className="swatch" style={{ background: CHART_COLORS.recoveryHigh }} /> Green{" "}
+              <span className="swatch" style={{ background: CHART_COLORS.recoveryHigh }} /> High{" "}
               <em>{zonePct.green}%</em>
             </li>
           </ul>

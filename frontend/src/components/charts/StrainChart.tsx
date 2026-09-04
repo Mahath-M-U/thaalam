@@ -10,7 +10,7 @@ import {
 import type { CycleRecord } from "../../types";
 import { shortDate } from "../../utils";
 import { ChartCard } from "../ChartCard";
-import { CHART_COLORS, axisLine, axisTick, gridStroke, tooltipStyle } from "../../chartTheme";
+import { AMBER_14, axisLine, axisTick, CHART_COLORS, gridStroke, tooltipStyle } from "../../chartTheme";
 
 interface Props {
   records: CycleRecord[];
@@ -41,12 +41,6 @@ export function StrainChart({ records }: Props) {
     >
       <ResponsiveContainer width="100%" height={280}>
         <AreaChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-          <defs>
-            <linearGradient id="strainFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={CHART_COLORS.strain} stopOpacity={0.35} />
-              <stop offset="100%" stopColor={CHART_COLORS.strain} stopOpacity={0.02} />
-            </linearGradient>
-          </defs>
           <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
           <XAxis
             dataKey="label"
@@ -68,7 +62,7 @@ export function StrainChart({ records }: Props) {
             name="Strain"
             stroke={CHART_COLORS.strain}
             strokeWidth={2}
-            fill="url(#strainFill)"
+            fill={AMBER_14}
             dot={false}
           />
         </AreaChart>

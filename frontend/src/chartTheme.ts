@@ -1,32 +1,41 @@
-/** Shared Recharts styling so every chart matches the light editorial theme (see docs/design.md). */
+/** Shared Recharts styling — true-black + amber Mahath tokens. */
+
+export const AMBER = "#FFC400";
+export const AMBER_60 = "rgba(255,196,0,0.6)";
+export const AMBER_35 = "rgba(255,196,0,0.35)";
+export const AMBER_14 = "rgba(255,196,0,0.14)";
+export const AMBER_08 = "rgba(255,196,0,0.08)";
 
 export const CHART_COLORS = {
-  recovery: "#16a34a",
-  recoveryLow: "#dc2626",
-  recoveryMid: "#d97706",
-  recoveryHigh: "#16a34a",
-  strain: "#3f7ca8",
-  sleep: "#8868b8",
-  hrv: "#2f9e6e",
-  rhr: "#c2607a",
-  amber: "#c9793f",
-  rose: "#c2607a",
-  neutral: "#a8a29e",
+  recovery: AMBER,
+  recoveryLow: AMBER_35,
+  recoveryMid: AMBER_60,
+  recoveryHigh: AMBER,
+  strain: AMBER,
+  sleep: AMBER_60,
+  hrv: "#FFFFFF",
+  rhr: AMBER,
+  amber: AMBER,
+  rose: AMBER_60,
+  neutral: "#8A8A8A",
+  out: "#666666",
 };
 
-export const gridStroke = "#e7e5e4";
+export const gridStroke = "#2A2A2A";
 
-export const axisTick = { fill: "#a8a29e", fontSize: 11 };
+export const axisTick = { fill: "#8A8A8A", fontSize: 11 };
 
-export const axisLine = { stroke: "#d6d3d1" };
+export const axisLine = { stroke: "#333333" };
+
+export const guideStroke = "#333333";
 
 export const tooltipStyle = {
-  background: "#ffffff",
-  border: "1px solid #e7e5e4",
-  borderRadius: 12,
-  color: "#0c0a09",
+  background: "#1A1A1A",
+  border: "1px solid #333333",
+  borderRadius: 16,
+  color: "#FFFFFF",
   fontSize: 12,
-  boxShadow: "0 4px 16px rgba(12, 10, 9, 0.08)",
+  boxShadow: "0 2px 12px rgba(0,0,0,.5)",
 };
 
-export const legendStyle = { fontSize: 12, color: "#777169" };
+export const legendStyle = { fontSize: 12, color: "#8A8A8A" };

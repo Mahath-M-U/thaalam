@@ -14,16 +14,17 @@ import {
   ZAxis,
 } from "recharts";
 import type { DailyRecord, InsightsResponse } from "../../types";
-import { formatNumber, shortDate } from "../../utils";
+import { formatNumber, isWithinDays, shortDate } from "../../utils";
 import { ChartCard } from "../ChartCard";
 import { CHART_COLORS, axisLine, axisTick, gridStroke, legendStyle, tooltipStyle } from "../../chartTheme";
 
 interface Props {
   daily: DailyRecord[];
   insights: InsightsResponse;
+  rangeDays?: number;
 }
 
-export function SleepVsRecoveryChart({ daily, insights }: Props) {
+export function SleepVsRecoveryChart({ daily, insights, rangeDays }: Props) {
   const section = insights.sections?.sleep_recovery;
   const corr = section?.correlation;
   const corrEff = section?.correlation_sleep_efficiency;
@@ -34,7 +35,7 @@ export function SleepVsRecoveryChart({ daily, insights }: Props) {
   const mid = section?.avg_recovery_mid_sleep;
   const n = section?.n_pairs;
 
-  const scatter =
+  const scatter = (
     section?.scatter?.map((p) => ({
       ...p,
       label: shortDate(p.date),
@@ -46,9 +47,10 @@ export function SleepVsRecoveryChart({ daily, insights }: Props) {
         label: shortDate(d.cycle_start),
         sleep_performance: d.sleep_performance_percentage as number,
         recovery_score: d.recovery_score as number,
-      }));
+      }))
+  ).filter((p) => (rangeDays == null ? true : isWithinDays(p.date, rangeDays)));
 
-  const dual =
+  const dual = (
     section?.dual_series?.map((p) => ({
       ...p,
       label: shortDate(p.date),
@@ -60,7 +62,8 @@ export function SleepVsRecoveryChart({ daily, insights }: Props) {
         label: shortDate(d.cycle_start),
         sleep_performance: d.sleep_performance_percentage,
         recovery_score: d.recovery_score,
-      }));
+      }))
+  ).filter((p) => (rangeDays == null ? true : isWithinDays(p.date, rangeDays)));
 
   const buckets = section?.buckets ?? [];
 
@@ -156,7 +159,7 @@ export function SleepVsRecoveryChart({ daily, insights }: Props) {
                 value: "Sleep performance %",
                 position: "insideBottom",
                 offset: -2,
-                fill: "#a8a29e",
+                fill: axisTick.fill,
                 fontSize: 11,
               }}
             />
@@ -173,7 +176,7 @@ export function SleepVsRecoveryChart({ daily, insights }: Props) {
                 value: "Recovery",
                 angle: -90,
                 position: "insideLeft",
-                fill: "#a8a29e",
+                fill: axisTick.fill,
                 fontSize: 11,
               }}
             />
@@ -184,7 +187,7 @@ export function SleepVsRecoveryChart({ daily, insights }: Props) {
               formatter={(value, name) => [value, name]}
               labelFormatter={() => ""}
             />
-            <Scatter data={scatter} fill={CHART_COLORS.sleep} fillOpacity={0.75} />
+            <Scatter data={scatter} fill={CHART_COLORS.neutral} fillOpacity={0.85} />
           </ScatterChart>
         </ResponsiveContainer>
       </ChartCard>

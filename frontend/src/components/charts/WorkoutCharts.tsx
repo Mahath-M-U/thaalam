@@ -121,7 +121,7 @@ export function WorkoutFrequencyChart({ workouts }: FreqProps) {
             width={28}
           />
           <Tooltip contentStyle={tooltipStyle} />
-          <Bar dataKey="count" name="Workouts" fill={CHART_COLORS.strain} radius={[4, 4, 0, 0]} />
+          <Bar dataKey="count" name="Workouts" fill={CHART_COLORS.amber} radius={[4, 4, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </ChartCard>
