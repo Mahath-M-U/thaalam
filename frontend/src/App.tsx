@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { HrvRhrChart } from "./components/charts/HrvRhrChart";
 import { RecoveryChart } from "./components/charts/RecoveryChart";
 import { SleepStagesChart } from "./components/charts/SleepStagesChart";
@@ -10,13 +10,32 @@ import {
   StrainBySportChart,
   WorkoutFrequencyChart,
 } from "./components/charts/WorkoutCharts";
+import { CardiacEfficiencyDive, CardiacEfficiencyPreview } from "./components/deepDives/CardiacEfficiencyDive";
+import { CircadianPhaseDive, CircadianPhasePreview } from "./components/deepDives/CircadianPhaseDive";
+import { HyperarousalDive } from "./components/deepDives/HyperarousalDive";
+import { StageDependencyDive, StageDependencyPreview } from "./components/deepDives/StageDependencyDive";
+import { StrainSensitivityDive, StrainSensitivityPreview } from "./components/deepDives/StrainSensitivityDive";
+import { GenericReadDive } from "./components/DeepDive";
 import { InsightsPanel } from "./components/InsightsPanel";
+import { ReadsTable } from "./components/ReadsTable";
 import { Section } from "./components/Section";
 import { SleepDetailTable } from "./components/SleepDetailTable";
 import { StatCards } from "./components/StatCards";
 import { api } from "./api";
 import { useDashboardData } from "./hooks/useDashboardData";
-import type { SectionId } from "./types";
+import type {
+  CardiacSportDive,
+  DerivedRead,
+  DerivedReadDiveResponse,
+  DerivedReadsResponse,
+  HyperarousalPoint,
+  PhaseCalendarCell,
+  PhasePenaltyBar,
+  SectionId,
+  SportEfficiencyDelta,
+  StageVarianceSlice,
+  StrainScatterPoint,
+} from "./types";
 import {
   DEFAULT_RANGE_DAYS,
   filterByDays,
@@ -24,21 +43,44 @@ import {
   type RangeDays,
 } from "./utils";
 
-const NAV: { id: SectionId; label: string }[] = [
+const NAV: { id: SectionId | "reads"; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "insights", label: "Insights" },
   { id: "recovery", label: "Recovery" },
   { id: "strain", label: "Strain" },
   { id: "sleep", label: "Sleep" },
   { id: "workouts", label: "Workouts" },
+  { id: "reads", label: "Reads" },
 ];
 
 export default function App() {
   const { data, loading, error, reload } = useDashboardData();
-  const [section, setSection] = useState<SectionId>("overview");
+  const [section, setSection] = useState<SectionId | "reads">("overview");
   const [rangeDays, setRangeDays] = useState<RangeDays>(DEFAULT_RANGE_DAYS);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [readsPayload, setReadsPayload] = useState<DerivedReadsResponse | null>(null);
+  const [openRead, setOpenRead] = useState<string | null>(null);
+  const [divePayload, setDivePayload] = useState<DerivedReadDiveResponse | null>(null);
+
+  useEffect(() => {
+    if (!data) return;
+    void api
+      .derivedReads()
+      .then(setReadsPayload)
+      .catch(() => setReadsPayload(null));
+  }, [data]);
+
+  useEffect(() => {
+    if (!openRead) {
+      setDivePayload(null);
+      return;
+    }
+    void api
+      .derivedReadDive(openRead)
+      .then(setDivePayload)
+      .catch(() => setDivePayload(null));
+  }, [openRead]);
 
   const handleRefresh = async () => {
     setSyncing(true);
@@ -83,6 +125,12 @@ export default function App() {
 
   const nightCount = data?.sleep.filter((s) => !s.nap).length ?? 0;
   const sessionCount = data?.workouts.length ?? 0;
+  const reads = readsPayload?.reads ?? [];
+  const readById = (id: string) => reads.find((row) => row.id === id);
+  const cardiacPreview = readById("cardiac_efficiency")?.preview as
+    | { sports?: SportEfficiencyDelta[] }
+    | undefined;
+  const efficiencyDeltas = cardiacPreview?.sports ?? [];
 
   return (
     <div className="app">
@@ -103,6 +151,7 @@ export default function App() {
               className={`${section === item.id ? "active" : ""}${item.id === "overview" ? " nav-home" : ""}`.trim()}
               onClick={() => {
                 setSection(item.id);
+                setOpenRead(null);
                 document.getElementById(item.id)?.scrollIntoView({ behavior: "smooth" });
               }}
             >
@@ -197,11 +246,56 @@ export default function App() {
               <StatCards stats={data.summary.stats} latest={data.summary.latest} />
             </div>
 
+            {openRead ? (
+              divePayload?.read ? (
+              <ReadDive
+                read={divePayload.read}
+                dive={divePayload.dive}
+                onBack={() => setOpenRead(null)}
+              />
+              ) : (
+                <div className="state-panel">
+                  <div className="spinner" />
+                  <p>Loading your baseline…</p>
+                </div>
+              )
+            ) : (
+              <>
             <InsightsPanel
               insights={data.insights}
               dailyBrief={data.dailyBrief}
               rangeDays={rangeDays}
+              onOpenRead={setOpenRead}
             />
+
+            {reads.length > 0 ? (
+              <Section id="derived-charts" title="Load and rhythm">
+                {readById("cardiac_efficiency") ? (
+                  <CardiacEfficiencyPreview
+                    read={readById("cardiac_efficiency") as DerivedRead}
+                    onOpen={() => setOpenRead("cardiac_efficiency")}
+                  />
+                ) : null}
+                {readById("strain_sensitivity") ? (
+                  <StrainSensitivityPreview
+                    read={readById("strain_sensitivity") as DerivedRead}
+                    onOpen={() => setOpenRead("strain_sensitivity")}
+                  />
+                ) : null}
+                {readById("stage_dependency") ? (
+                  <StageDependencyPreview
+                    read={readById("stage_dependency") as DerivedRead}
+                    onOpen={() => setOpenRead("stage_dependency")}
+                  />
+                ) : null}
+                {readById("circadian_phase") ? (
+                  <CircadianPhasePreview
+                    read={readById("circadian_phase") as DerivedRead}
+                    onOpen={() => setOpenRead("circadian_phase")}
+                  />
+                ) : null}
+              </Section>
+            ) : null}
 
             <Section id="recovery" title="Recovery">
               <RecoveryChart records={recovery} />
@@ -226,15 +320,86 @@ export default function App() {
 
             <Section id="workouts" title="Workouts">
               <WorkoutFrequencyChart workouts={workouts} />
-              <StrainBySportChart sports={data.sports} />
+              <StrainBySportChart
+                sports={data.sports}
+                efficiencyDeltas={efficiencyDeltas}
+                onOpenRead={setOpenRead}
+              />
             </Section>
+
+            {reads.length > 0 ? <ReadsTable reads={reads} onOpen={setOpenRead} /> : null}
 
             <footer className="page-footer">
               Thaalam · React + FastAPI · data stays on your machine
             </footer>
+              </>
+            )}
           </>
         )}
       </main>
     </div>
+  );
+}
+
+function ReadDive({
+  read,
+  dive,
+  onBack,
+}: {
+  read: DerivedRead;
+  dive: Record<string, unknown>;
+  onBack: () => void;
+}) {
+  if (read.id === "cardiac_efficiency") {
+    return (
+      <CardiacEfficiencyDive
+        read={read}
+        dive={dive as { sports?: CardiacSportDive[]; focus?: string; meaning?: string; calibrating?: boolean }}
+        onBack={onBack}
+      />
+    );
+  }
+  if (read.id === "hyperarousal") {
+    return (
+      <HyperarousalDive
+        read={read}
+        dive={dive as { scatter?: HyperarousalPoint[]; meaning?: string; calibrating?: boolean; drivers?: { name: string; count: number; pct: number | null }[] }}
+        onBack={onBack}
+      />
+    );
+  }
+  if (read.id === "stage_dependency") {
+    return (
+      <StageDependencyDive
+        read={read}
+        dive={dive as { variance?: StageVarianceSlice[]; stacked_14?: { date: string; rem: number | null; deep: number | null; light: number | null }[]; meaning?: string | null; calibrating?: boolean; dominant?: string | null }}
+        onBack={onBack}
+      />
+    );
+  }
+  if (read.id === "strain_sensitivity") {
+    return (
+      <StrainSensitivityDive
+        read={read}
+        dive={dive as { scatter?: StrainScatterPoint[]; slope?: number | null; intercept?: number | null; trend_12w?: { date: string; slope: number | null }[]; meaning?: string; calibrating?: boolean }}
+        onBack={onBack}
+      />
+    );
+  }
+  if (read.id === "circadian_phase") {
+    return (
+      <CircadianPhaseDive
+        read={read}
+        dive={dive as { calendar?: PhaseCalendarCell[]; penalty_bars?: PhasePenaltyBar[]; meaning?: string; calibrating?: boolean }}
+        onBack={onBack}
+      />
+    );
+  }
+  return (
+    <GenericReadDive
+      read={read}
+      meaning={typeof dive.meaning === "string" ? dive.meaning : null}
+      onBack={onBack}
+    />
   );
 }

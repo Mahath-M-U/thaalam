@@ -30,13 +30,21 @@ import {
   tooltipStyle,
 } from "../chartTheme";
 
+const READ_ENTRY: Record<string, string> = {
+  strain_recovery_lag: "strain_sensitivity",
+  sleep_recovery: "stage_dependency",
+  sleep_debt: "hyperarousal",
+  training_readiness: "adaptation_window",
+};
+
 interface Props {
   insights: InsightsResponse;
   dailyBrief: DailyBriefResponse;
   rangeDays?: number;
+  onOpenRead?: (id: string) => void;
 }
 
-export function InsightsPanel({ insights, dailyBrief, rangeDays }: Props) {
+export function InsightsPanel({ insights, dailyBrief, rangeDays, onOpenRead }: Props) {
   if (!insights.ready) {
     return (
       <Section id="insights" title="Insights">
@@ -98,17 +106,34 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays }: Props) {
       </div>
 
       <div className="insight-cards wide">
-        {insights.cards.map((card) => (
-          <article key={card.id} className={`insight-card tone-${card.tone}`}>
-            <div className="insight-card-top">
-              <span className="insight-status">{rewriteTriScaleCopy(card.status)}</span>
-              <h3>{rewriteTriScaleCopy(card.title)}</h3>
-            </div>
-            <div className="insight-value">{rewriteTriScaleCopy(card.value)}</div>
-            <div className="insight-sub">{rewriteTriScaleCopy(card.subtitle)}</div>
-            <p>{rewriteTriScaleCopy(card.detail)}</p>
-          </article>
-        ))}
+        {insights.cards.map((card) => {
+          const readId = READ_ENTRY[card.id];
+          const clickable = Boolean(readId && onOpenRead);
+          return (
+            <article
+              key={card.id}
+              className={`insight-card tone-${card.tone}${clickable ? " clickable" : ""}`}
+              onClick={clickable ? () => onOpenRead?.(readId) : undefined}
+              onKeyDown={
+                clickable
+                  ? (event) => {
+                      if (event.key === "Enter" || event.key === " ") onOpenRead?.(readId);
+                    }
+                  : undefined
+              }
+              role={clickable ? "button" : undefined}
+              tabIndex={clickable ? 0 : undefined}
+            >
+              <div className="insight-card-top">
+                <span className="insight-status">{rewriteTriScaleCopy(card.status)}</span>
+                <h3>{rewriteTriScaleCopy(card.title)}</h3>
+              </div>
+              <div className="insight-value">{rewriteTriScaleCopy(card.value)}</div>
+              <div className="insight-sub">{rewriteTriScaleCopy(card.subtitle)}</div>
+              <p>{rewriteTriScaleCopy(card.detail)}</p>
+            </article>
+          );
+        })}
       </div>
 
       {hrvSeries.length > 0 && (
@@ -174,6 +199,7 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays }: Props) {
               />
             </LineChart>
           </ResponsiveContainer>
+          <p className="chart-footnote">30-day rolling mean of your own HRV · ±10% band around that mean.</p>
         </ChartCard>
       )}
 
@@ -215,6 +241,7 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays }: Props) {
               />
             </LineChart>
           </ResponsiveContainer>
+          <p className="chart-footnote">Acute 7-day / chronic 28-day day-strain on your own cycles.</p>
         </ChartCard>
       )}
 
@@ -248,6 +275,7 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays }: Props) {
               />
             </BarChart>
           </ResponsiveContainer>
+          <p className="chart-footnote">All history · next-morning recovery after prior-day strain buckets on your cycles.</p>
         </ChartCard>
       )}
 
@@ -305,6 +333,7 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays }: Props) {
               <em>{zonePct.green}%</em>
             </li>
           </ul>
+          <p className="chart-footnote">All history · share of your recovery scores as an amber opacity ladder.</p>
         </ChartCard>
       )}
 
@@ -370,6 +399,7 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays }: Props) {
               />
             </BarChart>
           </ResponsiveContainer>
+          <p className="chart-footnote">All history · average recovery and strain by weekday on your own cycles.</p>
         </ChartCard>
       )}
 
@@ -426,6 +456,7 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays }: Props) {
               />
             </LineChart>
           </ResponsiveContainer>
+          <p className="chart-footnote">WHOOP sleep_needed versus in-bed time on your scored nights.</p>
         </ChartCard>
       )}
 
@@ -485,6 +516,7 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays }: Props) {
               />
             </LineChart>
           </ResponsiveContainer>
+          <p className="chart-footnote">7-day rolling means of your recovery and day strain.</p>
         </ChartCard>
       )}
 

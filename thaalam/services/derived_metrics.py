@@ -118,6 +118,12 @@ def recompute(
             n_sessions,
             calibrating,
         )
+        try:
+            from thaalam.services.reads_service import compute_and_store_reads
+
+            compute_and_store_reads(con, user_id=resolved_user_id, now=now)
+        except Exception:
+            logger.exception("Failed to compute derived reads")
     else:
         logger.info("No profile user_id; derived baselines not stored")
 

@@ -3,6 +3,9 @@ import type {
   CycleRecord,
   DailyBriefResponse,
   DailyRecord,
+  DerivedReadDiveResponse,
+  DerivedReadsResponse,
+  DerivedRunwayResponse,
   InsightsResponse,
   ProfileResponse,
   RecordsResponse,
@@ -45,4 +48,8 @@ export const api = {
   briefExplain: (question: string) =>
     requestJson<BriefExplainerResponse>(`/api/brief/explain?question=${encodeURIComponent(question)}`),
   sync: () => requestJson<{ ok: boolean }>("/api/sync", { method: "POST" }),
+  derivedReads: () => requestJson<DerivedReadsResponse>("/api/derived/reads"),
+  derivedReadDive: (id: string) =>
+    requestJson<DerivedReadDiveResponse>(`/api/derived/reads/${encodeURIComponent(id)}`),
+  derivedRunway: () => requestJson<DerivedRunwayResponse>("/api/derived/runway"),
 };
