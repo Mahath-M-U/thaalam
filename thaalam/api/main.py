@@ -13,9 +13,12 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from thaalam.api.routes import briefs, data, health
+from dotenv import load_dotenv
+
+from thaalam.api.routes import briefs, data, derived, health, oauth, webhooks
 from thaalam.logging_config import setup_logging
 
+load_dotenv()
 setup_logging()
 
 app = FastAPI(
@@ -41,6 +44,9 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(data.router)
 app.include_router(briefs.router)
+app.include_router(oauth.router)
+app.include_router(webhooks.router)
+app.include_router(derived.router)
 
 
 @app.get("/")

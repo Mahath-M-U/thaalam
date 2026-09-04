@@ -66,11 +66,15 @@ class WhoopClient(WhoopAuth):
 
     def get_profile(self) -> dict[str, Any]:
         """Get the authenticated user's basic profile."""
-        return self._get("v2/user/profile/basic")
+        profile = self._get("v2/user/profile/basic")
+        assert profile is not None
+        return profile
 
     def get_body_measurement(self) -> dict[str, Any]:
         """Get the authenticated user's body measurements."""
-        return self._get("v2/user/measurement/body")
+        measurement = self._get("v2/user/measurement/body")
+        assert measurement is not None
+        return measurement
 
     # ---- activity ID mapping -----------------------------------------------
 
@@ -80,9 +84,9 @@ class WhoopClient(WhoopAuth):
 
     # ---- cycles -------------------------------------------------------------
 
-    def get_cycle_by_id(self, cycle_id: int) -> dict[str, Any]:
+    def get_cycle_by_id(self, cycle_id: int, *, optional: bool = False) -> dict[str, Any] | None:
         """Get a single physiological cycle by ID."""
-        return self._get(f"v2/cycle/{cycle_id}")
+        return self._get(f"v2/cycle/{cycle_id}", optional=optional)
 
     def get_cycle_collection(
         self, start_date: str | None = None, end_date: str | None = None
@@ -90,13 +94,13 @@ class WhoopClient(WhoopAuth):
         """Get all physiological cycles in the given date range (default: all)."""
         return self._get_paginated("v2/cycle", start_date, end_date)
 
-    def get_recovery_for_cycle(self, cycle_id: int) -> dict[str, Any]:
+    def get_recovery_for_cycle(self, cycle_id: int, *, optional: bool = False) -> dict[str, Any] | None:
         """Get the recovery associated with a cycle."""
-        return self._get(f"v2/cycle/{cycle_id}/recovery")
+        return self._get(f"v2/cycle/{cycle_id}/recovery", optional=optional)
 
-    def get_sleep_for_cycle(self, cycle_id: int) -> dict[str, Any]:
+    def get_sleep_for_cycle(self, cycle_id: int, *, optional: bool = False) -> dict[str, Any] | None:
         """Get the sleep associated with a cycle."""
-        return self._get(f"v2/cycle/{cycle_id}/sleep")
+        return self._get(f"v2/cycle/{cycle_id}/sleep", optional=optional)
 
     # ---- recovery -------------------------------------------------------------
 
@@ -108,9 +112,9 @@ class WhoopClient(WhoopAuth):
 
     # ---- sleep -------------------------------------------------------------
 
-    def get_sleep_by_id(self, sleep_id: str) -> dict[str, Any]:
+    def get_sleep_by_id(self, sleep_id: str, *, optional: bool = False) -> dict[str, Any] | None:
         """Get a single sleep by ID."""
-        return self._get(f"v2/activity/sleep/{sleep_id}")
+        return self._get(f"v2/activity/sleep/{sleep_id}", optional=optional)
 
     def get_sleep_collection(
         self, start_date: str | None = None, end_date: str | None = None
@@ -127,9 +131,9 @@ class WhoopClient(WhoopAuth):
 
     # ---- workouts -------------------------------------------------------------
 
-    def get_workout_by_id(self, workout_id: str) -> dict[str, Any]:
+    def get_workout_by_id(self, workout_id: str, *, optional: bool = False) -> dict[str, Any] | None:
         """Get a single workout by ID."""
-        return self._get(f"v2/activity/workout/{workout_id}")
+        return self._get(f"v2/activity/workout/{workout_id}", optional=optional)
 
     def get_workout_collection(
         self, start_date: str | None = None, end_date: str | None = None
@@ -139,7 +143,13 @@ class WhoopClient(WhoopAuth):
 
     # ---- internal helpers -------------------------------------------------------------
 
-    def _get(self, url_slug: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    def _get(
+        self,
+        url_slug: str,
+        params: dict[str, Any] | None = None,
+        *,
+        optional: bool = False,
+    ) -> dict[str, Any] | None:
         self.ensure_fresh_token()
         url = f"{API_BASE_URL}/{url_slug}"
 
@@ -166,6 +176,8 @@ class WhoopClient(WhoopAuth):
             response = self.session.get(url, params=params)
             attempt += 1
 
+        if optional and response.status_code == 404:
+            return None
         response.raise_for_status()
         data: dict[str, Any] = response.json()
         return data

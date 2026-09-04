@@ -12,13 +12,21 @@ import logging
 from typing import Any
 
 import duckdb
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
-from thaalam.api.deps import get_readonly_connection
+from thaalam import db as thaalam_db
+from thaalam.api.deps import (
+    DB_PATH,
+    build_whoop_client,
+    get_readonly_connection,
+    is_whoop_connected,
+)
 from thaalam.api.serializers import dataframe_to_records, first_record
 from thaalam.repositories import queries
 from thaalam.services import report_service
+from thaalam.services.derived_metrics import recompute
 from thaalam.services.insights_service import build_insights
+from thaalam.sync import sync_all_historical_data
 
 logger = logging.getLogger(__name__)
 
@@ -282,6 +290,24 @@ def get_insights(
 ) -> dict[str, Any]:
     """Derived insights: HRV baseline, ACWR, sleep-recovery links, etc."""
     return build_insights(con)
+
+
+@router.post("/sync")
+def post_sync() -> dict[str, Any]:
+    """Manual Refresh override: run the same server-side WHOOP sync as nightly."""
+    if not is_whoop_connected():
+        raise HTTPException(status_code=409, detail="WHOOP is not connected")
+    client = build_whoop_client()
+    try:
+        result = sync_all_historical_data(client, DB_PATH, force=True)
+    finally:
+        client.close()
+    con = thaalam_db.get_connection(DB_PATH)
+    try:
+        recompute(con, trigger="manual")
+    finally:
+        con.close()
+    return {"ok": True, "skipped": bool(result.get("skipped")), "records": result.get("records", 0)}
 
 
 def _num(value: Any) -> float | int | None:

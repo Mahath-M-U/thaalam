@@ -14,8 +14,8 @@ import type {
   WorkoutRecord,
 } from "./types";
 
-async function getJson<T>(path: string): Promise<T> {
-  const res = await fetch(path);
+async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(path, init);
   if (!res.ok) {
     let detail = res.statusText;
     try {
@@ -30,18 +30,19 @@ async function getJson<T>(path: string): Promise<T> {
 }
 
 export const api = {
-  health: () => getJson<{ status: string; database_exists: boolean }>("/health"),
-  summary: () => getJson<SummaryResponse>("/api/summary"),
-  profile: () => getJson<ProfileResponse>("/api/profile"),
-  recovery: () => getJson<RecordsResponse<RecoveryRecord>>("/api/recovery"),
-  cycles: () => getJson<RecordsResponse<CycleRecord>>("/api/cycles"),
-  daily: () => getJson<RecordsResponse<DailyRecord>>("/api/daily"),
-  sleep: () => getJson<RecordsResponse<SleepRecord>>("/api/sleep"),
-  workouts: () => getJson<RecordsResponse<WorkoutRecord>>("/api/workouts"),
-  sleepStages: () => getJson<{ stages: SleepStage[]; nights?: number }>("/api/sleep/stages/average"),
-  workoutsBySport: () => getJson<{ sports: SportStrain[] }>("/api/workouts/by-sport"),
-  insights: () => getJson<InsightsResponse>("/api/insights"),
-  dailyBrief: () => getJson<DailyBriefResponse>("/api/brief"),
+  health: () => requestJson<{ status: string; database_exists: boolean }>("/health"),
+  summary: () => requestJson<SummaryResponse>("/api/summary"),
+  profile: () => requestJson<ProfileResponse>("/api/profile"),
+  recovery: () => requestJson<RecordsResponse<RecoveryRecord>>("/api/recovery"),
+  cycles: () => requestJson<RecordsResponse<CycleRecord>>("/api/cycles"),
+  daily: () => requestJson<RecordsResponse<DailyRecord>>("/api/daily"),
+  sleep: () => requestJson<RecordsResponse<SleepRecord>>("/api/sleep"),
+  workouts: () => requestJson<RecordsResponse<WorkoutRecord>>("/api/workouts"),
+  sleepStages: () => requestJson<{ stages: SleepStage[]; nights?: number }>("/api/sleep/stages/average"),
+  workoutsBySport: () => requestJson<{ sports: SportStrain[] }>("/api/workouts/by-sport"),
+  insights: () => requestJson<InsightsResponse>("/api/insights"),
+  dailyBrief: () => requestJson<DailyBriefResponse>("/api/brief"),
   briefExplain: (question: string) =>
-    getJson<BriefExplainerResponse>(`/api/brief/explain?question=${encodeURIComponent(question)}`),
+    requestJson<BriefExplainerResponse>(`/api/brief/explain?question=${encodeURIComponent(question)}`),
+  sync: () => requestJson<{ ok: boolean }>("/api/sync", { method: "POST" }),
 };

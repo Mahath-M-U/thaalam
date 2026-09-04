@@ -16,8 +16,12 @@ consent step.
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 import json
 import logging
+import os
 import secrets
 import time
 from pathlib import Path
@@ -27,6 +31,10 @@ from urllib.parse import parse_qs, urlencode, urlparse
 import requests
 
 logger = logging.getLogger(__name__)
+
+# Encrypted-at-rest token files start with this prefix so we can still
+# detect and migrate the older plaintext JSON cache in one pass.
+TOKEN_FILE_PREFIX = b"THAALAM1."
 
 AUTHORIZE_URL = "https://api.prod.whoop.com/oauth/oauth2/auth"
 TOKEN_URL = "https://api.prod.whoop.com/oauth/oauth2/token"
@@ -59,6 +67,8 @@ class WhoopAuth:
         scopes: list[str] | None = None,
         token: dict[str, Any] | None = None,
         token_path: str | Path | None = None,
+        token_key: str | bytes | None = None,
+        token_key_path: str | Path | None = None,
         authorize_url: str = AUTHORIZE_URL,
         token_url: str = TOKEN_URL,
         revoke_url: str = REVOKE_URL,
@@ -71,14 +81,19 @@ class WhoopAuth:
         self.token_url = token_url
         self.revoke_url = revoke_url
         self.token_path = Path(token_path) if token_path else None
+        self.token_key_path = Path(token_key_path) if token_key_path else None
+        if self.token_key_path is None and self.token_path is not None:
+            self.token_key_path = self.token_path.with_name("whoop_token.key")
 
         self.session = requests.Session()
         self._token: dict[str, Any] | None = None
+        self._token_key = _resolve_token_key(token_key, self.token_key_path)
 
         if token is not None:
             self._set_token(token, persist=False)
         elif self.token_path and self.token_path.exists():
-            self._set_token(json.loads(self.token_path.read_text()), persist=False)
+            loaded, migrated = _load_token_file(self.token_path, self._token_key)
+            self._set_token(loaded, persist=migrated)
             logger.debug("Loaded cached WHOOP token from %s", self.token_path)
 
     def __enter__(self) -> WhoopAuth:
@@ -175,6 +190,8 @@ class WhoopAuth:
         response = self.session.post(self.token_url, data=data)
         response.raise_for_status()
         token: dict[str, Any] = response.json()
+        # WHOOP rotates the refresh token; persist the replacement atomically
+        # so a crash between exchange and write cannot strand the old token.
         self._set_token(token)
         logger.info("Refreshed WHOOP access token; expires in %ss", token.get("expires_in"))
         return token
@@ -195,17 +212,110 @@ class WhoopAuth:
         logger.info("Revoked WHOOP OAuth access.")
 
     def _set_token(self, token: dict[str, Any], *, persist: bool = True) -> None:
-        token = dict(token)
+        incoming = dict(token)
+        # Keep the previous refresh token if a response omits it; WHOOP's
+        # rotating grant normally includes a replacement, which then wins.
+        if self._token:
+            merged = dict(self._token)
+            merged.update(incoming)
+            token = merged
+        else:
+            token = incoming
 
         # A token freshly issued/refreshed by WHOOP has a relative
         # "expires_in" (seconds). A token reloaded from disk already has
         # our own absolute "expires_at" and must not be recomputed.
-        if "expires_at" not in token:
+        if "expires_at" not in incoming:
             token["expires_at"] = time.time() + float(token.get("expires_in", 0))
 
         self._token = token
         self.session.headers["Authorization"] = f"Bearer {token['access_token']}"
 
         if persist and self.token_path:
-            self.token_path.parent.mkdir(parents=True, exist_ok=True)
-            self.token_path.write_text(json.dumps(token, indent=2))
+            _persist_token_file(self.token_path, token, self._token_key)
+
+
+def _resolve_token_key(explicit: str | bytes | None, key_path: Path | None) -> bytes:
+    """32-byte key from the constructor, WHOOP_TOKEN_KEY, or a local key file."""
+    if isinstance(explicit, bytes) and explicit:
+        if len(explicit) != 32:
+            raise ValueError("token_key bytes must be 32 bytes")
+        return explicit
+    if isinstance(explicit, str) and explicit.strip():
+        return _parse_token_key(explicit)
+
+    env_key = os.getenv("WHOOP_TOKEN_KEY")
+    if env_key and env_key.strip():
+        return _parse_token_key(env_key)
+
+    if key_path is None:
+        return os.urandom(32)
+
+    if key_path.exists():
+        return _parse_token_key(key_path.read_text(encoding="utf-8"))
+
+    key = os.urandom(32)
+    key_path.parent.mkdir(parents=True, exist_ok=True)
+    key_path.write_text(base64.urlsafe_b64encode(key).decode("ascii") + "\n", encoding="utf-8")
+    return key
+
+
+def _parse_token_key(value: str) -> bytes:
+    text = value.strip()
+    if len(text) == 64 and all(c in "0123456789abcdefABCDEF" for c in text):
+        return bytes.fromhex(text)
+    padded = text + "=" * (-len(text) % 4)
+    raw = base64.urlsafe_b64decode(padded.encode("ascii"))
+    if len(raw) != 32:
+        raise ValueError("WHOOP_TOKEN_KEY must decode to 32 bytes")
+    return raw
+
+
+def _keystream(key: bytes, nonce: bytes, length: int) -> bytes:
+    out = bytearray()
+    counter = 0
+    while len(out) < length:
+        block = hmac.new(key, nonce + counter.to_bytes(8, "big"), hashlib.sha256).digest()
+        out.extend(block)
+        counter += 1
+    return bytes(out[:length])
+
+
+def _encrypt_token_blob(plaintext: bytes, key: bytes) -> bytes:
+    nonce = os.urandom(16)
+    ciphertext = bytes(a ^ b for a, b in zip(plaintext, _keystream(key, nonce, len(plaintext))))
+    tag = hmac.new(key, b"enc" + nonce + ciphertext, hashlib.sha256).digest()
+    return TOKEN_FILE_PREFIX + base64.urlsafe_b64encode(nonce + ciphertext + tag)
+
+
+def _decrypt_token_blob(blob: bytes, key: bytes) -> bytes:
+    payload = blob[len(TOKEN_FILE_PREFIX) :] if blob.startswith(TOKEN_FILE_PREFIX) else blob
+    raw = base64.urlsafe_b64decode(payload)
+    if len(raw) < 48:
+        raise ValueError("Encrypted token file is truncated")
+    nonce, ciphertext, tag = raw[:16], raw[16:-32], raw[-32:]
+    expected = hmac.new(key, b"enc" + nonce + ciphertext, hashlib.sha256).digest()
+    if not hmac.compare_digest(expected, tag):
+        raise ValueError("Token file authentication failed")
+    return bytes(a ^ b for a, b in zip(ciphertext, _keystream(key, nonce, len(ciphertext))))
+
+
+def _load_token_file(path: Path, key: bytes) -> tuple[dict[str, Any], bool]:
+    """Return `(token, migrated)` — `migrated` is True when plaintext was rewritten encrypted."""
+    raw = path.read_bytes()
+    if raw.startswith(TOKEN_FILE_PREFIX):
+        return json.loads(_decrypt_token_blob(raw, key)), False
+
+    token = json.loads(raw.decode("utf-8"))
+    if not isinstance(token, dict):
+        raise ValueError(f"Token file {path} did not contain a JSON object")
+    logger.info("Migrating plaintext WHOOP token cache at %s to encrypted storage", path)
+    return token, True
+
+
+def _persist_token_file(path: Path, token: dict[str, Any], key: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    blob = _encrypt_token_blob(json.dumps(token, indent=2).encode("utf-8"), key)
+    tmp_path = path.with_name(path.name + ".tmp")
+    tmp_path.write_bytes(blob)
+    os.replace(tmp_path, path)

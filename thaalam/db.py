@@ -161,6 +161,36 @@ _SCHEMA_STATEMENTS = [
         energy_expended INTEGER
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS derived_baselines (
+        user_id BIGINT PRIMARY KEY,
+        computed_at TIMESTAMP,
+        n_nights INTEGER,
+        n_sessions INTEGER,
+        hrv_mean_90d DOUBLE,
+        rhr_mean_90d DOUBLE,
+        sleep_midpoint_mean_21d DOUBLE,
+        calibrating BOOLEAN,
+        awaiting_sleep_close BOOLEAN,
+        yesterday_complete BOOLEAN,
+        steps_source VARCHAR,
+        weights VARCHAR
+    )
+    """,
+    """
+    CREATE SEQUENCE IF NOT EXISTS derived_recompute_log_id_seq
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS derived_recompute_log (
+        id BIGINT PRIMARY KEY DEFAULT nextval('derived_recompute_log_id_seq'),
+        user_id BIGINT,
+        computed_at TIMESTAMP,
+        trigger VARCHAR,
+        n_nights INTEGER,
+        n_sessions INTEGER,
+        details VARCHAR
+    )
+    """,
 ]
 
 
@@ -398,6 +428,119 @@ def record_insight_brief(
         "insight_briefs",
         ["user_id", "brief_date", "brief_text", "rule_ids", "generated_at"],
         [(user_id, brief_date, brief_text, _as_json(rule_ids), datetime.now(timezone.utc))],
+    )
+
+
+def delete_sleep(con: duckdb.DuckDBPyConnection, sleep_id: Any) -> None:
+    con.execute("DELETE FROM sleep WHERE CAST(id AS VARCHAR) = ?", [str(sleep_id)])
+
+
+def delete_workout(con: duckdb.DuckDBPyConnection, workout_id: Any) -> None:
+    con.execute("DELETE FROM workouts WHERE CAST(id AS VARCHAR) = ?", [str(workout_id)])
+
+
+def delete_recovery(con: duckdb.DuckDBPyConnection, resource_id: Any) -> None:
+    """Delete a recovery by sleep UUID (v2) or cycle id (v1). Missing rows are a no-op."""
+    con.execute("DELETE FROM recovery WHERE CAST(sleep_id AS VARCHAR) = ?", [str(resource_id)])
+    try:
+        cycle_id = int(resource_id)
+    except (TypeError, ValueError):
+        return
+    con.execute("DELETE FROM recovery WHERE cycle_id = ?", [cycle_id])
+
+
+def upsert_derived_baseline(con: duckdb.DuckDBPyConnection, row: dict[str, Any]) -> None:
+    columns = [
+        "user_id",
+        "computed_at",
+        "n_nights",
+        "n_sessions",
+        "hrv_mean_90d",
+        "rhr_mean_90d",
+        "sleep_midpoint_mean_21d",
+        "calibrating",
+        "awaiting_sleep_close",
+        "yesterday_complete",
+        "steps_source",
+        "weights",
+    ]
+    values = (
+        row.get("user_id"),
+        row.get("computed_at"),
+        row.get("n_nights"),
+        row.get("n_sessions"),
+        row.get("hrv_mean_90d"),
+        row.get("rhr_mean_90d"),
+        row.get("sleep_midpoint_mean_21d"),
+        row.get("calibrating"),
+        row.get("awaiting_sleep_close"),
+        row.get("yesterday_complete"),
+        row.get("steps_source"),
+        row.get("weights") if isinstance(row.get("weights"), str) else _as_json(row.get("weights")),
+    )
+    _upsert(con, "derived_baselines", columns, [values])
+
+
+def get_derived_baseline(
+    con: duckdb.DuckDBPyConnection, user_id: int | None = None
+) -> dict[str, Any] | None:
+    sql = """
+        SELECT user_id, computed_at, n_nights, n_sessions,
+               hrv_mean_90d, rhr_mean_90d, sleep_midpoint_mean_21d,
+               calibrating, awaiting_sleep_close, yesterday_complete,
+               steps_source, weights
+        FROM derived_baselines
+    """
+    params: list[Any] = []
+    if user_id is not None:
+        sql += " WHERE user_id = ?"
+        params.append(user_id)
+    sql += " LIMIT 1"
+    row = con.execute(sql, params).fetchone()
+    if row is None:
+        return None
+    weights = row[11]
+    if isinstance(weights, str):
+        try:
+            weights = json.loads(weights)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            pass
+    return {
+        "user_id": row[0],
+        "computed_at": row[1],
+        "n_nights": row[2],
+        "n_sessions": row[3],
+        "hrv_mean_90d": row[4],
+        "rhr_mean_90d": row[5],
+        "sleep_midpoint_mean_21d": row[6],
+        "calibrating": bool(row[7]) if row[7] is not None else None,
+        "awaiting_sleep_close": bool(row[8]) if row[8] is not None else None,
+        "yesterday_complete": bool(row[9]) if row[9] is not None else None,
+        "steps_source": row[10],
+        "weights": weights,
+    }
+
+
+def record_derived_recompute(
+    con: duckdb.DuckDBPyConnection,
+    user_id: int | None,
+    trigger: str,
+    n_nights: int,
+    n_sessions: int,
+    details: dict[str, Any] | None = None,
+) -> None:
+    con.execute(
+        "INSERT INTO derived_recompute_log "
+        "(user_id, computed_at, trigger, n_nights, n_sessions, details) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        [
+            user_id,
+            datetime.now(timezone.utc).replace(tzinfo=None),
+            trigger,
+            n_nights,
+            n_sessions,
+            _as_json(details),
+        ],
     )
 
 

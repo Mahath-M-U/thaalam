@@ -1,18 +1,28 @@
-"""Shared FastAPI dependencies (DB connections, paths)."""
+"""Shared FastAPI dependencies (DB connections, paths, WHOOP client)."""
 
 from __future__ import annotations
 
+import os
 from collections.abc import Generator
 from pathlib import Path
 from threading import Lock
 
 import duckdb
+from dotenv import load_dotenv
 from fastapi import HTTPException
 
 from thaalam.db import DEFAULT_DB_PATH
 from thaalam.db import get_connection as _open_base_connection
+from thaalam.whoop_client.auth import AUTHORIZE_URL, REVOKE_URL, TOKEN_URL
+from thaalam.whoop_client.client import WhoopClient
+
+load_dotenv()
 
 DB_PATH = DEFAULT_DB_PATH
+DATA_DIR = Path(DEFAULT_DB_PATH).resolve().parent
+TOKEN_PATH = DATA_DIR / "whoop_token.json"
+TOKEN_KEY_PATH = DATA_DIR / "whoop_token.key"
+OAUTH_STATE_PATH = DATA_DIR / "whoop_oauth_state.json"
 
 # DuckDB refuses a second `connect()` to the same file with a different
 # read_only/config than an already-open connection in the same process --
@@ -67,3 +77,56 @@ def get_writable_connection() -> Generator[duckdb.DuckDBPyConnection, None, None
         yield con
     finally:
         con.close()
+
+
+def get_or_create_connection() -> Generator[duckdb.DuckDBPyConnection, None, None]:
+    """Writable cursor; creates the database on first connect / OAuth backfill."""
+    con = _get_base_connection().cursor()
+    try:
+        yield con
+    finally:
+        con.close()
+
+
+def whoop_credentials() -> dict[str, str]:
+    return {
+        "client_id": os.getenv("CLIENT_ID") or "",
+        "client_secret": os.getenv("CLIENT_SECRET") or "",
+        "redirect_uri": os.getenv("REDIRECT_URI") or "",
+        "authorize_url": os.getenv("AUTHORIZATION_URL") or AUTHORIZE_URL,
+        "token_url": os.getenv("TOKEN_URL") or TOKEN_URL,
+        "revoke_url": os.getenv("REVOKE_URL") or REVOKE_URL,
+        "token_key": os.getenv("WHOOP_TOKEN_KEY") or "",
+    }
+
+
+def build_whoop_client() -> WhoopClient:
+    creds = whoop_credentials()
+    if not creds["client_id"] or not creds["client_secret"]:
+        raise RuntimeError("CLIENT_ID and CLIENT_SECRET must be set")
+    kwargs: dict = {
+        "redirect_uri": creds["redirect_uri"] or None,
+        "authorize_url": creds["authorize_url"],
+        "token_url": creds["token_url"],
+        "revoke_url": creds["revoke_url"],
+        "token_path": TOKEN_PATH,
+        "token_key_path": TOKEN_KEY_PATH,
+    }
+    if creds["token_key"]:
+        kwargs["token_key"] = creds["token_key"]
+    return WhoopClient(creds["client_id"], creds["client_secret"], **kwargs)
+
+
+def is_whoop_connected() -> bool:
+    """Whether a refreshable token is stored locally -- never inspects secret values for clients."""
+    if not TOKEN_PATH.exists():
+        return False
+    try:
+        client = build_whoop_client()
+    except Exception:
+        return False
+    try:
+        token = client.token or {}
+        return bool(token.get("refresh_token") or token.get("access_token"))
+    finally:
+        client.close()

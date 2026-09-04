@@ -14,6 +14,7 @@ import { InsightsPanel } from "./components/InsightsPanel";
 import { Section } from "./components/Section";
 import { SleepDetailTable } from "./components/SleepDetailTable";
 import { StatCards } from "./components/StatCards";
+import { api } from "./api";
 import { useDashboardData } from "./hooks/useDashboardData";
 import type { SectionId } from "./types";
 import {
@@ -94,7 +95,20 @@ export default function App() {
         </nav>
 
         <div className="sidebar-foot">
-          <button type="button" className="btn ghost" onClick={() => void reload()}>
+          <button
+            type="button"
+            className="btn ghost"
+            onClick={() =>
+              void (async () => {
+                try {
+                  await api.sync();
+                } catch {
+                  /* still reload local rows */
+                }
+                await reload();
+              })()
+            }
+          >
             Refresh data
           </button>
           <div className="baseline-card">
