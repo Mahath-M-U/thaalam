@@ -11,6 +11,7 @@ import type {
   SleepStage,
   SportStrain,
   SummaryResponse,
+  VitalityResponse,
   WorkoutRecord,
 } from "./types";
 
@@ -45,4 +46,5 @@ export const api = {
   briefExplain: (question: string) =>
     requestJson<BriefExplainerResponse>(`/api/brief/explain?question=${encodeURIComponent(question)}`),
   sync: () => requestJson<{ ok: boolean }>("/api/sync", { method: "POST" }),
+  vitality: () => requestJson<VitalityResponse>("/api/derived/vitality"),
 };

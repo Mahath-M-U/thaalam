@@ -1,5 +1,5 @@
 import type { LatestMetrics, StatCard } from "../types";
-import { formatNumber, recoveryColor } from "../utils";
+import { formatNumber } from "../utils";
 
 interface Props {
   stats: StatCard[];
@@ -11,16 +11,12 @@ export function StatCards({ stats, latest }: Props) {
 
   return (
     <div className="stat-grid">
-      <div className="stat-card featured">
+      <div className="stat-card">
         <div className="stat-label">Latest recovery</div>
-        <div className="stat-value" style={{ color: recoveryColor(recovery) }}>
+        <div className="stat-value" style={{ color: "var(--amber)" }}>
           {formatNumber(recovery, 0)}
         </div>
-        <div className="stat-sub">
-          {latest.cycle_start
-            ? new Date(latest.cycle_start).toLocaleDateString()
-            : ""}
-        </div>
+        <div className="stat-sub">Autonomic readiness</div>
       </div>
 
       <div className="stat-card">

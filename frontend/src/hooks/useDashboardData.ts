@@ -11,8 +11,23 @@ import type {
   SleepStage,
   SportStrain,
   SummaryResponse,
+  VitalityResponse,
   WorkoutRecord,
 } from "../types";
+
+export const EMPTY_VITALITY: VitalityResponse = {
+  present: false,
+  score: null,
+  band: null,
+  parts: [],
+  trend_30d: [],
+  calibrating: true,
+  sleep_not_closed: false,
+  verdict: "Your vitality score lands here once nights are scored.",
+  cause: "",
+  delta_14d: null,
+  supporting: null,
+};
 
 export interface DashboardData {
   summary: SummaryResponse;
@@ -26,6 +41,7 @@ export interface DashboardData {
   sports: SportStrain[];
   insights: InsightsResponse;
   dailyBrief: DailyBriefResponse;
+  vitality: VitalityResponse;
 }
 
 interface State {
@@ -56,6 +72,7 @@ export function useDashboardData() {
         sportsRes,
         insights,
         dailyBrief,
+        vitality,
       ] = await Promise.all([
         api.summary(),
         api.profile(),
@@ -68,6 +85,7 @@ export function useDashboardData() {
         api.workoutsBySport(),
         api.insights(),
         api.dailyBrief(),
+        api.vitality().catch(() => EMPTY_VITALITY),
       ]);
 
       setState({
@@ -85,6 +103,7 @@ export function useDashboardData() {
           sports: sportsRes.sports,
           insights,
           dailyBrief,
+          vitality,
         },
       });
     } catch (err) {

@@ -191,6 +191,23 @@ _SCHEMA_STATEMENTS = [
         details VARCHAR
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS derived_vitality (
+        user_id BIGINT,
+        score_date DATE,
+        computed_at TIMESTAMP,
+        score INTEGER,
+        band VARCHAR,
+        parts VARCHAR,
+        calibrating BOOLEAN,
+        sleep_not_closed BOOLEAN,
+        verdict VARCHAR,
+        cause VARCHAR,
+        supporting VARCHAR,
+        delta_14d INTEGER,
+        PRIMARY KEY (user_id, score_date)
+    )
+    """,
 ]
 
 
@@ -578,3 +595,126 @@ def upsert_workouts(con: duckdb.DuckDBPyConnection, workouts: list[dict[str, Any
             _as_json(workout),
         ))
     _upsert(con, "workouts", columns, rows)
+
+
+def upsert_derived_vitality_rows(
+    con: duckdb.DuckDBPyConnection, rows: list[dict[str, Any]]
+) -> None:
+    if not rows:
+        return
+    columns = [
+        "user_id",
+        "score_date",
+        "computed_at",
+        "score",
+        "band",
+        "parts",
+        "calibrating",
+        "sleep_not_closed",
+        "verdict",
+        "cause",
+        "supporting",
+        "delta_14d",
+    ]
+    values = []
+    for row in rows:
+        values.append(
+            (
+                row.get("user_id"),
+                row.get("score_date"),
+                row.get("computed_at"),
+                row.get("score"),
+                row.get("band"),
+                row.get("parts")
+                if isinstance(row.get("parts"), str)
+                else _as_json(row.get("parts")),
+                row.get("calibrating"),
+                row.get("sleep_not_closed"),
+                row.get("verdict"),
+                row.get("cause"),
+                row.get("supporting")
+                if isinstance(row.get("supporting"), str)
+                else _as_json(row.get("supporting")),
+                row.get("delta_14d"),
+            )
+        )
+    _upsert(con, "derived_vitality", columns, values)
+
+
+def get_latest_derived_vitality(
+    con: duckdb.DuckDBPyConnection, user_id: int | None = None
+) -> dict[str, Any] | None:
+    sql = """
+        SELECT user_id, score_date, computed_at, score, band, parts,
+               calibrating, sleep_not_closed, verdict, cause, supporting, delta_14d
+        FROM derived_vitality
+    """
+    params: list[Any] = []
+    if user_id is not None:
+        sql += " WHERE user_id = ?"
+        params.append(user_id)
+    sql += " ORDER BY score_date DESC LIMIT 1"
+    row = con.execute(sql, params).fetchone()
+    if row is None:
+        return None
+    return _vitality_row(row)
+
+
+def get_derived_vitality_trend(
+    con: duckdb.DuckDBPyConnection,
+    *,
+    user_id: int | None = None,
+    days: int = 30,
+) -> list[dict[str, Any]]:
+    sql = """
+        SELECT score_date, score
+        FROM derived_vitality
+        WHERE score IS NOT NULL
+    """
+    params: list[Any] = []
+    if user_id is not None:
+        sql += " AND user_id = ?"
+        params.append(user_id)
+    sql += " ORDER BY score_date DESC LIMIT ?"
+    params.append(days)
+    rows = con.execute(sql, params).fetchall()
+    out: list[dict[str, Any]] = []
+    for score_date, score in reversed(rows):
+        out.append(
+            {
+                "date": score_date.isoformat() if hasattr(score_date, "isoformat") else str(score_date),
+                "score": int(score) if score is not None else None,
+            }
+        )
+    return out
+
+
+def _vitality_row(row: tuple[Any, ...]) -> dict[str, Any]:
+    parts = row[5]
+    if isinstance(parts, str):
+        try:
+            parts = json.loads(parts)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            parts = []
+    supporting = row[10]
+    if isinstance(supporting, str):
+        try:
+            supporting = json.loads(supporting)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            supporting = None
+    score_date = row[1]
+    return {
+        "user_id": row[0],
+        "score_date": score_date.isoformat() if hasattr(score_date, "isoformat") else score_date,
+        "computed_at": row[2],
+        "score": row[3],
+        "band": row[4],
+        "parts": parts or [],
+        "calibrating": bool(row[6]) if row[6] is not None else None,
+        "sleep_not_closed": bool(row[7]) if row[7] is not None else None,
+        "verdict": row[8],
+        "cause": row[9],
+        "supporting": supporting,
+        "delta_14d": row[11],
+        "present": True,
+    }

@@ -25,3 +25,13 @@ def get_baselines(
         "calibrating": bool(row.get("calibrating")),
         "baseline": row,
     }
+
+
+@router.get("/vitality")
+def get_vitality(
+    con: duckdb.DuckDBPyConnection = Depends(get_readonly_connection),
+) -> dict[str, Any]:
+    """Vitality Score 0–1000. Client only renders; scoring is server-side."""
+    from thaalam.services.vitality_score import build_vitality_payload
+
+    return build_vitality_payload(con)

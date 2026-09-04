@@ -1,8 +1,9 @@
 """Server-side derived metrics stored in DuckDB.
 
 The client never recomputes a baseline, slope, or projection -- it reads
-the stored `derived_baselines` row. Later PRs fill in score/reads/runway
-via `recompute()`; this module computes baselines from real WHOOP rows.
+the stored `derived_baselines` row. `recompute()` also writes the Vitality
+Score; later PRs fill in reads/runway. This module computes baselines
+from real WHOOP rows.
 """
 
 from __future__ import annotations
@@ -97,6 +98,9 @@ def recompute(
 
     if resolved_user_id is not None:
         db.upsert_derived_baseline(con, row)
+        from thaalam.services.vitality_score import persist_vitality
+
+        persist_vitality(con, user_id=resolved_user_id, now=now, baseline=row)
         db.record_derived_recompute(
             con,
             resolved_user_id,

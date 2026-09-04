@@ -280,3 +280,43 @@ export interface BriefExplainerResponse {
   answer: string;
 }
 
+export interface VitalityPart {
+  key: string;
+  name: string;
+  pts: number;
+  max_pts: number;
+  weight: number;
+  sub: number;
+  actual: number | null;
+  band_lo: number | null;
+  band_hi: number | null;
+  unit?: string;
+  note: string;
+}
+
+export interface VitalityTrendPoint {
+  date: string;
+  score: number;
+}
+
+export interface VitalitySupporting {
+  day_strain: number | null;
+  day_strain_max: number;
+  sleep_yield: number | null;
+  resting_hr: number | null;
+}
+
+export interface VitalityResponse {
+  present: boolean;
+  score: number | null;
+  band: string | null;
+  parts: VitalityPart[];
+  trend_30d: VitalityTrendPoint[];
+  calibrating: boolean;
+  sleep_not_closed: boolean;
+  verdict: string;
+  cause: string;
+  delta_14d: number | null;
+  supporting: VitalitySupporting | null;
+}
+

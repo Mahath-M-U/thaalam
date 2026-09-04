@@ -11,6 +11,7 @@ import {
   WorkoutFrequencyChart,
 } from "./components/charts/WorkoutCharts";
 import { InsightsPanel } from "./components/InsightsPanel";
+import { ScoreRingCard } from "./components/ScoreRingCard";
 import { Section } from "./components/Section";
 import { SleepDetailTable } from "./components/SleepDetailTable";
 import { StatCards } from "./components/StatCards";
@@ -139,9 +140,9 @@ export default function App() {
         <header className="topbar">
           <div>
             <h1>Hello, {name}</h1>
-            <p className="muted">
-              Local WHOOP metrics from DuckDB — interactive charts over your
-              synced history.
+            <p className="verdict">
+              {data?.vitality?.verdict ||
+                "Your vitality score lands here once nights are scored."}
             </p>
           </div>
           <div className="topbar-actions">
@@ -164,6 +165,8 @@ export default function App() {
             )}
           </div>
         </header>
+
+        {data && !loading ? <ScoreRingCard vitality={data.vitality} /> : null}
 
         {loading && (
           <div className="state-panel">
