@@ -1,7 +1,6 @@
 import { Area, ComposedChart, Line, ReferenceLine, ResponsiveContainer, YAxis } from "recharts";
 import { AMBER } from "../chartTheme";
 import type { RunwayResponse } from "../types";
-import { shortDate } from "../utils";
 
 interface ChartRow {
   date: string;
@@ -42,12 +41,30 @@ export function buildRunwayChartData(runway: RunwayResponse): ChartRow[] {
   return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
 
+function dayParts(isoDate: string): [number, number, number] | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(isoDate);
+  if (!match) return null;
+  return [Number(match[1]), Number(match[2]), Number(match[3])];
+}
+
 function dayDiff(from: string, to: string): number {
-  const a = from.split("-").map(Number);
-  const b = to.split("-").map(Number);
+  const a = dayParts(from);
+  const b = dayParts(to);
+  if (!a || !b) return 0;
   const da = Date.UTC(a[0], a[1] - 1, a[2]);
   const db = Date.UTC(b[0], b[1] - 1, b[2]);
   return Math.round((db - da) / 86_400_000);
+}
+
+/** YYYY-MM-DD as a local calendar date — not `new Date("YYYY-MM-DD")` (UTC midnight). */
+function formatDayLabel(isoDate: string): string {
+  const parts = dayParts(isoDate);
+  if (!parts) return isoDate;
+  const [y, m, d] = parts;
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 export function runwayAxisLabels(runway: RunwayResponse): { back: string; mid: string; forward: string } {
@@ -62,7 +79,7 @@ export function runwayAxisLabels(runway: RunwayResponse): { back: string; mid: s
   const lastProj = projection.length ? projection[projection.length - 1].date : origin;
   const fwd = Math.max(0, dayDiff(origin, lastProj));
   const mid =
-    runway.computed_on && origin === runway.computed_on ? "today" : shortDate(origin);
+    runway.computed_on && origin === runway.computed_on ? "today" : formatDayLabel(origin);
   return {
     back: `${backDays} days back`,
     mid,
