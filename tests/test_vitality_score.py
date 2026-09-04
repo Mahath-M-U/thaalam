@@ -17,6 +17,7 @@ from thaalam.services.vitality_score import (
     score_band_name,
     score_from_inputs,
     _circular_diff_minutes,
+    _circular_mean_hours,
 )
 
 USER_ID = 42
@@ -123,19 +124,20 @@ def test_score_is_sum_of_rounded_parts_partial_and_zero():
 
 
 def test_apply_rounded_points_uses_rounded_parts_not_unrounded_sum():
+    # 0.250 * 0.01 * 1000 = 2.5 → Math.round 3, Python bankers round 2.
     parts = [
-        {"weight": 0.340, "sub": 0.5},
-        {"weight": 0.250, "sub": 1 / 3},
-        {"weight": 0.250, "sub": 0.2},
-        {"weight": 0.160, "sub": 0.7},
+        {"weight": 0.250, "sub": 0.01},
+        {"weight": 0.250, "sub": 0.01},
     ]
     score = apply_rounded_points(parts)
     unrounded = sum(p["weight"] * p["sub"] * 1000 for p in parts)
+    assert parts[0]["pts"] == 3
+    assert parts[1]["pts"] == 3
+    assert score == 6
     assert score == sum(p["pts"] for p in parts)
-    assert score == js_round(170) + js_round(250 / 3) + js_round(50) + js_round(112)
-    # Unrounded total may differ from the sum of rounded parts.
-    assert score != pytest.approx(unrounded) or score == js_round(unrounded) or True
-    assert score == parts[0]["pts"] + parts[1]["pts"] + parts[2]["pts"] + parts[3]["pts"]
+    assert unrounded == pytest.approx(5.0)
+    assert js_round(unrounded) == 5
+    assert round(2.5) == 2
 
 
 def test_rhythm_full_credit_under_30_then_linear():
@@ -432,11 +434,104 @@ def test_same_day_sleep_is_not_waiting(tmp_db, monkeypatch):
     assert "waiting on last night" not in payload["verdict"].lower()
 
 
+def test_sleep_not_closed_uses_local_date_not_utc(tmp_db, monkeypatch):
+    monkeypatch.setenv("STEPS_SOURCE", "none")
+    _seed_profile(tmp_db)
+    # Closed 07:00 local on 10 Jul with Pacific offset. 01:00 UTC 11 Jul is still
+    # 18:00 local on the 10th — recovery for that night exists, ring must not dim.
+    _seed_night(tmp_db, 10, cycle_id=10, strain=12.0, tz="-07:00")
+    payload = build_vitality_payload(tmp_db, now=datetime(2026, 7, 11, 1, 0, 0))
+    assert payload["sleep_not_closed"] is False
+    assert "waiting on last night" not in payload["verdict"].lower()
+
+
+def test_sleep_not_closed_after_local_midnight_east_of_utc(tmp_db, monkeypatch):
+    monkeypatch.setenv("STEPS_SOURCE", "none")
+    _seed_profile(tmp_db)
+    _seed_night(tmp_db, 10, cycle_id=10, strain=12.0, tz="+10:00")
+    # 14:30 UTC 10 Jul is 00:30 local 11 Jul — last night is yesterday locally.
+    payload = build_vitality_payload(tmp_db, now=datetime(2026, 7, 10, 14, 30, 0))
+    assert payload["sleep_not_closed"] is True
+    assert "waiting on last night" in payload["verdict"].lower()
+
+
 def test_circular_midpoint_drift_wraps_midnight():
     assert _circular_diff_minutes(23.0, 1.0) == pytest.approx(120.0)
     assert _circular_diff_minutes(1.0, 23.0) == pytest.approx(120.0)
     assert _circular_diff_minutes(3.0, 3.0) == pytest.approx(0.0)
     assert _circular_diff_minutes(0.0, 12.0) == pytest.approx(720.0)
+
+
+def test_circular_mean_hours_wraps_midnight():
+    assert _circular_mean_hours([23.5, 0.5]) == pytest.approx(0.0, abs=0.05)
+    assert _circular_mean_hours([3.0, 3.0, 3.0]) == pytest.approx(3.0)
+    assert _circular_mean_hours([]) is None
+    # Arithmetic mean of these is 12; circular mean must stay near midnight.
+    mean = _circular_mean_hours([23.75, 0.25])
+    assert mean is not None
+    assert min(mean, 24.0 - mean) == pytest.approx(0.0, abs=0.05)
+    assert _circular_diff_minutes(0.25, mean) < 30
+
+
+def test_midnight_midpoints_do_not_cost_rhythm_points(tmp_db, monkeypatch):
+    monkeypatch.setenv("STEPS_SOURCE", "none")
+    _seed_profile(tmp_db)
+    # 19:45–03:45 (mid 23:45) then 20:15–04:15 (mid 00:15). Linear mean is noon.
+    nights = [
+        (1, "2026-06-30T19:45:00.000Z", "2026-07-01T03:45:00.000Z"),
+        (2, "2026-07-01T20:15:00.000Z", "2026-07-02T04:15:00.000Z"),
+    ]
+    for cycle_id, start, end in nights:
+        db.upsert_sleep(
+            tmp_db,
+            [
+                {
+                    "id": f"sleep-{cycle_id}",
+                    "cycle_id": cycle_id,
+                    "user_id": USER_ID,
+                    "start": start,
+                    "end": end,
+                    "timezone_offset": "+00:00",
+                    "nap": False,
+                    "score_state": "SCORED",
+                    "score": {"sleep_performance_percentage": 85},
+                }
+            ],
+        )
+        db.upsert_recovery(
+            tmp_db,
+            [
+                {
+                    "cycle_id": cycle_id,
+                    "sleep_id": f"sleep-{cycle_id}",
+                    "user_id": USER_ID,
+                    "created_at": end,
+                    "score_state": "SCORED",
+                    "score": {
+                        "recovery_score": 70,
+                        "hrv_rmssd_milli": 50,
+                        "resting_heart_rate": 52,
+                    },
+                }
+            ],
+        )
+        db.upsert_cycles(
+            tmp_db,
+            [
+                {
+                    "id": cycle_id,
+                    "user_id": USER_ID,
+                    "start": end,
+                    "score_state": "SCORED",
+                    "score": {"strain": 12.0},
+                }
+            ],
+        )
+    payload = build_vitality_payload(tmp_db, now=datetime(2026, 7, 2, 12, 0, 0))
+    rhythm = next(p for p in payload["parts"] if p["key"] == "rhythm")
+    assert rhythm["actual"] is not None
+    assert rhythm["actual"] < 60
+    assert rhythm["pts"] == 160
 
 
 def test_personalise_bands_after_60_nights(tmp_db, monkeypatch):

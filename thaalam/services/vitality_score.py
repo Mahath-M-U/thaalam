@@ -121,6 +121,7 @@ class Night:
     tib_hours: float | None = None
     midpoint_hours: float | None = None
     steps: float | None = None
+    tz_offset: str | None = None
 
 
 def build_vitality_payload(
@@ -142,7 +143,7 @@ def build_vitality_payload(
         return _empty_payload(sleep_not_closed=False)
 
     last = nights[-1]
-    awaiting = last.day < now.date()
+    awaiting = _sleep_not_closed(last, now)
     scored = _score_night(last, nights, weights, has_steps=has_steps)
     trend = _trend_for(nights, weights, has_steps=has_steps, last_day=last.day)
     delta = _delta_from_trend(trend, scored["score"])
@@ -347,7 +348,7 @@ def _actuals_for(night: Night, prior: list[Night]) -> dict[str, float | None]:
         hrv_ratio = night.hrv / hrv_mean
 
     midpoints = [n.midpoint_hours for n in prior if n.midpoint_hours is not None][-MIDPOINT_NIGHTS:]
-    mid_mean = sum(midpoints) / len(midpoints) if midpoints else None
+    mid_mean = _circular_mean_hours(midpoints)
     drift = None
     if night.midpoint_hours is not None and mid_mean is not None:
         drift = _circular_diff_minutes(night.midpoint_hours, mid_mean)
@@ -642,6 +643,28 @@ def _delta_from_trend(trend: list[dict[str, Any]], current: int) -> int | None:
     return int(current) - int(target)
 
 
+def _sleep_not_closed(last: Night, now: datetime) -> bool:
+    """Compare the last local wake date to *local* today, not UTC today."""
+    local_now = now + dm._parse_offset(last.tz_offset)
+    return last.day < local_now.date()
+
+
+def _circular_mean_hours(hours: list[float]) -> float | None:
+    """Mean of clock-face hours so 23:30 and 00:30 average near midnight, not noon."""
+    if not hours:
+        return None
+    s = sum(math.sin(2 * math.pi * h / 24.0) for h in hours)
+    c = sum(math.cos(2 * math.pi * h / 24.0) for h in hours)
+    if s == 0.0 and c == 0.0:
+        return sum(hours) / len(hours)
+    ang = math.atan2(s, c)
+    hours_out = (ang / (2 * math.pi) * 24.0) % 24.0
+    # Tiny negative angles modulo 24 become 24.0 in IEEE remainder.
+    if hours_out < 1e-9 or hours_out > 24.0 - 1e-9:
+        return 0.0
+    return hours_out
+
+
 def _circular_diff_minutes(a: float, b: float) -> float:
     d = abs(a - b) % 24.0
     if d > 12.0:
@@ -721,6 +744,8 @@ def _load_nights(con: duckdb.DuckDBPyConnection) -> list[Night]:
         night.tib_hours = tib if tib is not None else night.tib_hours
         night.midpoint_hours = midpoint if midpoint is not None else night.midpoint_hours
         night.steps = steps_by_day.get(day, night.steps)
+        if tz_offset:
+            night.tz_offset = str(tz_offset)
         nights[day] = night
 
     return [nights[k] for k in sorted(nights)]
