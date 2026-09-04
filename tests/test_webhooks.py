@@ -6,16 +6,20 @@ import base64
 import hashlib
 import hmac
 import json
+import time
 
 import pytest
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
 
 from thaalam import db
+from thaalam.api.main import app
 from thaalam.api.routes.webhooks import check_webhook_signature, handle_whoop_event, verify_whoop_signature
 
 
 SECRET = "whoop-client-secret"
 TIMESTAMP = "1710000000000"
+NOW = float(TIMESTAMP) / 1000.0
 
 
 def _sign(body: bytes, timestamp: str = TIMESTAMP, secret: str = SECRET) -> str:
@@ -23,24 +27,28 @@ def _sign(body: bytes, timestamp: str = TIMESTAMP, secret: str = SECRET) -> str:
     return base64.b64encode(digest).decode("ascii")
 
 
+def _fresh_ts() -> str:
+    return str(int(time.time() * 1000))
+
+
 def test_valid_signature_accepted():
     body = b'{"type":"sleep.updated","id":"abc","user_id":1}'
     signature = _sign(body)
     assert verify_whoop_signature(body, TIMESTAMP, signature, SECRET) is True
-    check_webhook_signature(body, TIMESTAMP, signature, SECRET)
+    check_webhook_signature(body, TIMESTAMP, signature, SECRET, now=NOW)
 
 
 def test_invalid_signature_rejected():
     body = b'{"type":"sleep.updated","id":"abc","user_id":1}'
     with pytest.raises(HTTPException) as exc:
-        check_webhook_signature(body, TIMESTAMP, "not-a-real-signature", SECRET)
-    assert exc.value.status_code in (401, 403)
+        check_webhook_signature(body, TIMESTAMP, "not-a-real-signature", SECRET, now=NOW)
+    assert exc.value.status_code == 403
 
 
 def test_unsigned_webhook_rejected():
     body = b'{"type":"sleep.updated","id":"abc","user_id":1}'
     with pytest.raises(HTTPException) as exc:
-        check_webhook_signature(body, None, None, SECRET)
+        check_webhook_signature(body, None, None, SECRET, now=NOW)
     assert exc.value.status_code == 401
 
 
@@ -48,8 +56,23 @@ def test_tampered_body_rejected():
     body = b'{"type":"sleep.deleted","id":"abc","user_id":1}'
     signature = _sign(body)
     with pytest.raises(HTTPException) as exc:
-        check_webhook_signature(b'{"type":"sleep.deleted","id":"TAMPER","user_id":1}', TIMESTAMP, signature, SECRET)
-    assert exc.value.status_code in (401, 403)
+        check_webhook_signature(
+            b'{"type":"sleep.deleted","id":"TAMPER","user_id":1}',
+            TIMESTAMP,
+            signature,
+            SECRET,
+            now=NOW,
+        )
+    assert exc.value.status_code == 403
+
+
+def test_stale_timestamp_rejected_after_hmac():
+    body = b'{"type":"sleep.deleted","id":"abc","user_id":1}'
+    signature = _sign(body, TIMESTAMP)
+    with pytest.raises(HTTPException) as exc:
+        check_webhook_signature(body, TIMESTAMP, signature, SECRET, now=time.time())
+    assert exc.value.status_code == 403
+    assert "stale" in str(exc.value.detail).lower()
 
 
 def test_sleep_delete_removes_row_and_is_idempotent(tmp_db):
@@ -168,3 +191,68 @@ def test_payload_roundtrip_matches_whoop_signing_input():
     body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
     signature = _sign(body)
     assert verify_whoop_signature(body, TIMESTAMP, signature, SECRET)
+
+
+def _webhook_client(monkeypatch, tmp_db):
+    monkeypatch.setenv("CLIENT_SECRET", SECRET)
+    monkeypatch.setattr("thaalam.api.routes.webhooks.is_whoop_connected", lambda: False)
+    monkeypatch.setattr(
+        "thaalam.api.routes.webhooks.acquire_writable_connection",
+        lambda: tmp_db.cursor(),
+    )
+    return TestClient(app)
+
+
+def test_http_unsigned_webhook_is_401(tmp_db, monkeypatch):
+    client = _webhook_client(monkeypatch, tmp_db)
+    response = client.post("/api/webhooks/whoop", content=b'{"type":"sleep.deleted","id":"x"}')
+    assert response.status_code == 401
+
+
+def test_http_bad_hmac_is_403(tmp_db, monkeypatch):
+    client = _webhook_client(monkeypatch, tmp_db)
+    ts = _fresh_ts()
+    response = client.post(
+        "/api/webhooks/whoop",
+        content=b'{"type":"sleep.deleted","id":"x"}',
+        headers={
+            "x-whoop-signature": "not-a-real-signature",
+            "x-whoop-signature-timestamp": ts,
+        },
+    )
+    assert response.status_code == 403
+
+
+def test_http_valid_delete_is_200_and_row_gone(tmp_db, monkeypatch):
+    db.upsert_sleep(
+        tmp_db,
+        [
+            {
+                "id": "http-sleep",
+                "cycle_id": 21,
+                "user_id": 1,
+                "start": "2026-08-01T23:00:00.000Z",
+                "end": "2026-08-02T07:00:00.000Z",
+                "nap": False,
+                "score_state": "SCORED",
+                "score": {},
+            }
+        ],
+    )
+    body = b'{"user_id":1,"id":"http-sleep","type":"sleep.deleted","trace_id":"t"}'
+    ts = _fresh_ts()
+    client = _webhook_client(monkeypatch, tmp_db)
+    response = client.post(
+        "/api/webhooks/whoop",
+        content=body,
+        headers={
+            "x-whoop-signature": _sign(body, ts),
+            "x-whoop-signature-timestamp": ts,
+            "content-type": "application/json",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is True
+    assert payload["action"] == "deleted"
+    assert tmp_db.execute("SELECT COUNT(*) FROM sleep WHERE id = 'http-sleep'").fetchone()[0] == 0

@@ -36,10 +36,6 @@ from thaalam.whoop_client.client import WhoopClient
 
 logger = logging.getLogger(__name__)
 
-# Predates WHOOP's public launch; kept as a lower bound if BACKFILL_DAYS is unset
-# in a way that would otherwise request an unbounded range.
-HISTORY_START_DATE = "2010-01-01"
-
 # First-connect / reconnect window. Later runs are incremental.
 BACKFILL_DAYS = int(os.getenv("WHOOP_BACKFILL_DAYS", "90"))
 
@@ -71,13 +67,15 @@ def sync_all_historical_data(
     db_path: str | Path | None = None,
     *,
     force: bool = False,
+    con: duckdb.DuckDBPyConnection | None = None,
 ) -> dict[str, Any]:
     """Fetch profile, body measurement, and any new cycles/recovery/sleep/workouts.
 
     First run backfills `BACKFILL_DAYS`; later runs are incremental with overlap.
+    Pass `con` to reuse the API process connection instead of a second connect().
     """
     with _SYNC_LOCK:
-        return _sync_locked(client, db_path, force=force, mode="auto")
+        return _sync_locked(client, db_path, force=force, mode="auto", con=con)
 
 
 def backfill_window(
@@ -85,10 +83,13 @@ def backfill_window(
     db_path: str | Path | None = None,
     *,
     days: int = BACKFILL_DAYS,
+    con: duckdb.DuckDBPyConnection | None = None,
 ) -> dict[str, Any]:
     """Fetch a bounded start/end window (OAuth connect uses 90 days)."""
     with _SYNC_LOCK:
-        return _sync_locked(client, db_path, force=True, mode="backfill", window_days=days)
+        return _sync_locked(
+            client, db_path, force=True, mode="backfill", window_days=days, con=con
+        )
 
 
 def reconcile_recent(
@@ -96,10 +97,13 @@ def reconcile_recent(
     db_path: str | Path | None = None,
     *,
     days: int = RECONCILE_DAYS,
+    con: duckdb.DuckDBPyConnection | None = None,
 ) -> dict[str, Any]:
     """Re-fetch the last `days` because WHOOP records can be edited after the fact."""
     with _SYNC_LOCK:
-        return _sync_locked(client, db_path, force=True, mode="reconcile", window_days=days)
+        return _sync_locked(
+            client, db_path, force=True, mode="reconcile", window_days=days, con=con
+        )
 
 
 def _sync_locked(
@@ -109,8 +113,11 @@ def _sync_locked(
     force: bool,
     mode: str,
     window_days: int | None = None,
+    con: duckdb.DuckDBPyConnection | None = None,
 ) -> dict[str, Any]:
-    con = db.get_connection(db_path) if db_path is not None else db.get_connection()
+    owns_connection = con is None
+    if con is None:
+        con = db.get_connection(db_path) if db_path is not None else db.get_connection()
 
     try:
         if not force:
@@ -175,7 +182,8 @@ def _sync_locked(
         logger.exception("Sync failed")
         raise
     finally:
-        con.close()
+        if owns_connection:
+            con.close()
 
 
 def _window_for(

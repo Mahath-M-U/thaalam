@@ -8,18 +8,22 @@ import hmac
 import json
 import logging
 import os
+import time
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
 from thaalam import db
-from thaalam.api.deps import build_whoop_client, is_whoop_connected
+from thaalam.api.deps import acquire_writable_connection, build_whoop_client, is_whoop_connected
 from thaalam.services.derived_metrics import recompute
 from thaalam.whoop_client.client import WhoopClient
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/webhooks", tags=["webhooks"])
+
+# WHOOP timestamps are epoch millis; reject captures outside this window.
+WEBHOOK_MAX_SKEW_SECONDS = 5 * 60
 
 # sleep.updated/deleted, workout.updated/deleted, recovery.updated/deleted
 _SUPPORTED_TYPES = frozenset(
@@ -49,19 +53,39 @@ def verify_whoop_signature(
     return hmac.compare_digest(expected, signature.strip())
 
 
+def _timestamp_fresh(
+    timestamp: str,
+    *,
+    now: float | None = None,
+    max_skew_seconds: float = WEBHOOK_MAX_SKEW_SECONDS,
+) -> bool:
+    try:
+        raw = float(timestamp)
+    except (TypeError, ValueError):
+        return False
+    ts = raw / 1000.0 if raw > 1e11 else raw
+    current = time.time() if now is None else now
+    return abs(current - ts) <= max_skew_seconds
+
+
 def check_webhook_signature(
     body: bytes,
     timestamp: str | None,
     signature: str | None,
     secret: str | None,
+    *,
+    now: float | None = None,
+    max_skew_seconds: float = WEBHOOK_MAX_SKEW_SECONDS,
 ) -> None:
-    """Raise 401 if unsigned/missing secret, 403 if the HMAC does not match."""
+    """Raise 401 if unsigned/missing secret, 403 if HMAC mismatches or timestamp is stale."""
     if not signature or not timestamp:
         raise HTTPException(status_code=401, detail="Missing webhook signature")
     if not secret:
         raise HTTPException(status_code=401, detail="Missing webhook signature")
     if not verify_whoop_signature(body, timestamp, signature, secret):
         raise HTTPException(status_code=403, detail="Invalid webhook signature")
+    if not _timestamp_fresh(timestamp, now=now, max_skew_seconds=max_skew_seconds):
+        raise HTTPException(status_code=403, detail="Stale webhook timestamp")
 
 
 def handle_whoop_event(
@@ -145,16 +169,16 @@ async def whoop_webhook(request: Request) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="Invalid JSON")
 
     client: WhoopClient | None = None
+    con = None
     try:
         if is_whoop_connected():
             client = build_whoop_client()
-        con = db.get_connection()
-        try:
-            result = handle_whoop_event(con, payload, client)
-            recompute(con, trigger="webhook")
-        finally:
-            con.close()
+        con = acquire_writable_connection()
+        result = handle_whoop_event(con, payload, client)
+        recompute(con, trigger="webhook")
         return {"ok": True, **result}
     finally:
+        if con is not None:
+            con.close()
         if client is not None:
             client.close()

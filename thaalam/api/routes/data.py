@@ -14,9 +14,8 @@ from typing import Any
 import duckdb
 from fastapi import APIRouter, Depends, HTTPException
 
-from thaalam import db as thaalam_db
 from thaalam.api.deps import (
-    DB_PATH,
+    acquire_writable_connection,
     build_whoop_client,
     get_readonly_connection,
     is_whoop_connected,
@@ -298,15 +297,13 @@ def post_sync() -> dict[str, Any]:
     if not is_whoop_connected():
         raise HTTPException(status_code=409, detail="WHOOP is not connected")
     client = build_whoop_client()
+    con = acquire_writable_connection()
     try:
-        result = sync_all_historical_data(client, DB_PATH, force=True)
-    finally:
-        client.close()
-    con = thaalam_db.get_connection(DB_PATH)
-    try:
+        result = sync_all_historical_data(client, force=True, con=con)
         recompute(con, trigger="manual")
     finally:
         con.close()
+        client.close()
     return {"ok": True, "skipped": bool(result.get("skipped")), "records": result.get("records", 0)}
 
 

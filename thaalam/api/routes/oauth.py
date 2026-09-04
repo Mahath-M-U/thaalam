@@ -15,9 +15,9 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from fastapi.responses import RedirectResponse
 
-from thaalam import db
 from thaalam.api.deps import (
     OAUTH_STATE_PATH,
+    acquire_writable_connection,
     build_whoop_client,
     is_whoop_connected,
     whoop_credentials,
@@ -88,9 +88,9 @@ def _run_oauth_backfill() -> None:
     client: WhoopClient | None = None
     try:
         client = build_whoop_client()
-        backfill_window(client, days=BACKFILL_DAYS)
-        con = db.get_connection()
+        con = acquire_writable_connection()
         try:
+            backfill_window(client, days=BACKFILL_DAYS, con=con)
             recompute(con, trigger="backfill")
         finally:
             con.close()

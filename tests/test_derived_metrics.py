@@ -12,7 +12,7 @@ from thaalam import db
 from thaalam.services.derived_metrics import OPTION2_WEIGHTS, recompute
 from thaalam.services.nightly_job import run_nightly_job
 from thaalam.sync import backfill_window, reconcile_recent
-from thaalam.whoop_client.auth import TOKEN_FILE_PREFIX, WhoopAuth
+from thaalam.whoop_client.auth import TOKEN_FILE_PREFIX, WhoopAuth, _sealed_marker
 from thaalam.whoop_client.client import WhoopClient
 
 USER_ID = 42
@@ -183,8 +183,66 @@ def test_token_rotation_persists_encrypted_refresh(tmp_path, monkeypatch):
         auth.close()
 
 
+def test_tampered_token_blob_fails_closed(tmp_path, monkeypatch):
+    monkeypatch.delenv("WHOOP_TOKEN_KEY", raising=False)
+    token_path = tmp_path / "whoop_token.json"
+    auth = WhoopAuth(
+        "client-id",
+        "client-secret",
+        token_path=token_path,
+        token_key=TEST_KEY,
+        token={
+            "access_token": "access",
+            "refresh_token": "refresh",
+            "expires_in": 3600,
+            "token_type": "bearer",
+        },
+    )
+    auth._set_token(auth.token, persist=True)  # type: ignore[arg-type]
+    auth.close()
+
+    raw = bytearray(token_path.read_bytes())
+    raw[-6] ^= 0x01
+    token_path.write_bytes(bytes(raw))
+
+    with pytest.raises(ValueError, match="Token file authentication failed"):
+        WhoopAuth("client-id", "client-secret", token_path=token_path, token_key=TEST_KEY)
+
+
+def test_plaintext_refused_after_encrypted_storage(tmp_path, monkeypatch):
+    monkeypatch.delenv("WHOOP_TOKEN_KEY", raising=False)
+    monkeypatch.delenv("WHOOP_MIGRATE_PLAINTEXT_TOKEN", raising=False)
+    token_path = tmp_path / "whoop_token.json"
+    auth = WhoopAuth(
+        "client-id",
+        "client-secret",
+        token_path=token_path,
+        token_key=TEST_KEY,
+        token={"access_token": "a", "refresh_token": "r", "expires_in": 3600},
+    )
+    auth._set_token(auth.token, persist=True)  # type: ignore[arg-type]
+    auth.close()
+    assert _sealed_marker(token_path).exists()
+
+    token_path.write_text(
+        json.dumps({"access_token": "evil", "refresh_token": "evil", "expires_at": 1}),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="Refusing plaintext"):
+        WhoopAuth("client-id", "client-secret", token_path=token_path, token_key=TEST_KEY)
+
+
+def test_non_dev_requires_whoop_token_key(tmp_path, monkeypatch):
+    monkeypatch.delenv("WHOOP_TOKEN_KEY", raising=False)
+    monkeypatch.delenv("ENV", raising=False)
+    monkeypatch.setenv("THAALAM_ENV", "production")
+    with pytest.raises(RuntimeError, match="WHOOP_TOKEN_KEY"):
+        WhoopAuth("client-id", "client-secret", token_path=tmp_path / "whoop_token.json")
+
+
 def test_plaintext_token_migrates_to_encrypted(tmp_path, monkeypatch):
     monkeypatch.delenv("WHOOP_TOKEN_KEY", raising=False)
+    monkeypatch.delenv("THAALAM_ENV", raising=False)
     token_path = tmp_path / "whoop_token.json"
     token_path.write_text(
         json.dumps(

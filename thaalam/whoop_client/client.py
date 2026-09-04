@@ -67,13 +67,15 @@ class WhoopClient(WhoopAuth):
     def get_profile(self) -> dict[str, Any]:
         """Get the authenticated user's basic profile."""
         profile = self._get("v2/user/profile/basic")
-        assert profile is not None
+        if profile is None:
+            raise RuntimeError("WHOOP profile endpoint returned no data")
         return profile
 
     def get_body_measurement(self) -> dict[str, Any]:
         """Get the authenticated user's body measurements."""
         measurement = self._get("v2/user/measurement/body")
-        assert measurement is not None
+        if measurement is None:
+            raise RuntimeError("WHOOP body measurement endpoint returned no data")
         return measurement
 
     # ---- activity ID mapping -----------------------------------------------

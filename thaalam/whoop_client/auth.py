@@ -82,12 +82,12 @@ class WhoopAuth:
         self.revoke_url = revoke_url
         self.token_path = Path(token_path) if token_path else None
         self.token_key_path = Path(token_key_path) if token_key_path else None
-        if self.token_key_path is None and self.token_path is not None:
-            self.token_key_path = self.token_path.with_name("whoop_token.key")
 
         self.session = requests.Session()
         self._token: dict[str, Any] | None = None
-        self._token_key = _resolve_token_key(token_key, self.token_key_path)
+        self._token_key = _resolve_token_key(
+            token_key, self.token_key_path, persist_path=self.token_path
+        )
 
         if token is not None:
             self._set_token(token, persist=False)
@@ -235,8 +235,33 @@ class WhoopAuth:
             _persist_token_file(self.token_path, token, self._token_key)
 
 
-def _resolve_token_key(explicit: str | bytes | None, key_path: Path | None) -> bytes:
-    """32-byte key from the constructor, WHOOP_TOKEN_KEY, or a local key file."""
+def default_token_key_path() -> Path:
+    env_file = (os.getenv("WHOOP_TOKEN_KEY_FILE") or "").strip()
+    if env_file:
+        return Path(env_file)
+    return Path.home() / ".thaalam" / "whoop_token.key"
+
+
+def _is_non_dev() -> bool:
+    env = (os.getenv("THAALAM_ENV") or os.getenv("ENV") or "").strip().lower()
+    if env in ("prod", "production", "staging"):
+        return True
+    flag = (os.getenv("WHOOP_REQUIRE_TOKEN_KEY") or "").strip().lower()
+    return flag in ("1", "true", "yes")
+
+
+def _resolve_token_key(
+    explicit: str | bytes | None,
+    key_path: Path | None,
+    *,
+    persist_path: Path | None,
+) -> bytes:
+    """32-byte master key from the constructor, WHOOP_TOKEN_KEY, or a key file.
+
+    The key file is never stored next to the token ciphertext. Non-dev
+    environments must set WHOOP_TOKEN_KEY; local/dev may generate a 0600
+    file once under ~/.thaalam (or WHOOP_TOKEN_KEY_FILE).
+    """
     if isinstance(explicit, bytes) and explicit:
         if len(explicit) != 32:
             raise ValueError("token_key bytes must be 32 bytes")
@@ -248,16 +273,62 @@ def _resolve_token_key(explicit: str | bytes | None, key_path: Path | None) -> b
     if env_key and env_key.strip():
         return _parse_token_key(env_key)
 
-    if key_path is None:
+    if persist_path is None and key_path is None:
         return os.urandom(32)
 
-    if key_path.exists():
-        return _parse_token_key(key_path.read_text(encoding="utf-8"))
+    if _is_non_dev():
+        raise RuntimeError(
+            "WHOOP_TOKEN_KEY must be set outside local development "
+            "(or pass token_key=). Refusing to mint a key beside the token file."
+        )
+
+    resolved = key_path or default_token_key_path()
+    _maybe_relocate_legacy_sibling_key(persist_path, resolved)
+
+    if resolved.exists():
+        key = _parse_token_key(resolved.read_text(encoding="utf-8"))
+        _chmod_private(resolved)
+        return key
 
     key = os.urandom(32)
-    key_path.parent.mkdir(parents=True, exist_ok=True)
-    key_path.write_text(base64.urlsafe_b64encode(key).decode("ascii") + "\n", encoding="utf-8")
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    resolved.write_text(base64.urlsafe_b64encode(key).decode("ascii") + "\n", encoding="utf-8")
+    _chmod_private(resolved)
     return key
+
+
+def _maybe_relocate_legacy_sibling_key(token_path: Path | None, dest: Path) -> None:
+    """Move an old data/whoop_token.key away from the ciphertext, once."""
+    if token_path is None or dest.exists():
+        return
+    legacy = token_path.with_name("whoop_token.key")
+    if not legacy.exists() or legacy.resolve() == dest.resolve():
+        return
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(legacy.read_bytes())
+    _chmod_private(dest)
+    try:
+        legacy.unlink()
+    except OSError:
+        logger.warning("Moved token key to %s; delete leftover %s", dest, legacy)
+        return
+    logger.info("Moved token key from %s to %s", legacy, dest)
+
+
+def _chmod_private(path: Path) -> None:
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
+
+
+def _sealed_marker(token_path: Path) -> Path:
+    return token_path.with_name(token_path.name + ".sealed")
+
+
+def _mark_encrypted(token_path: Path) -> None:
+    marker = _sealed_marker(token_path)
+    marker.write_text("1\n", encoding="utf-8")
 
 
 def _parse_token_key(value: str) -> bytes:
@@ -271,33 +342,46 @@ def _parse_token_key(value: str) -> bytes:
     return raw
 
 
-def _keystream(key: bytes, nonce: bytes, length: int) -> bytes:
+def _derive_keys(master: bytes) -> tuple[bytes, bytes]:
+    enc_key = hmac.new(master, b"thaalam-token-ctr", hashlib.sha256).digest()
+    mac_key = hmac.new(master, b"thaalam-token-mac", hashlib.sha256).digest()
+    return enc_key, mac_key
+
+
+def _keystream(enc_key: bytes, nonce: bytes, length: int) -> bytes:
     out = bytearray()
     counter = 0
     while len(out) < length:
-        block = hmac.new(key, nonce + counter.to_bytes(8, "big"), hashlib.sha256).digest()
+        block = hmac.new(enc_key, nonce + counter.to_bytes(8, "big"), hashlib.sha256).digest()
         out.extend(block)
         counter += 1
     return bytes(out[:length])
 
 
 def _encrypt_token_blob(plaintext: bytes, key: bytes) -> bytes:
+    enc_key, mac_key = _derive_keys(key)
     nonce = os.urandom(16)
-    ciphertext = bytes(a ^ b for a, b in zip(plaintext, _keystream(key, nonce, len(plaintext))))
-    tag = hmac.new(key, b"enc" + nonce + ciphertext, hashlib.sha256).digest()
+    ciphertext = bytes(a ^ b for a, b in zip(plaintext, _keystream(enc_key, nonce, len(plaintext))))
+    tag = hmac.new(mac_key, b"enc" + nonce + ciphertext, hashlib.sha256).digest()
     return TOKEN_FILE_PREFIX + base64.urlsafe_b64encode(nonce + ciphertext + tag)
 
 
 def _decrypt_token_blob(blob: bytes, key: bytes) -> bytes:
+    enc_key, mac_key = _derive_keys(key)
     payload = blob[len(TOKEN_FILE_PREFIX) :] if blob.startswith(TOKEN_FILE_PREFIX) else blob
     raw = base64.urlsafe_b64decode(payload)
     if len(raw) < 48:
         raise ValueError("Encrypted token file is truncated")
     nonce, ciphertext, tag = raw[:16], raw[16:-32], raw[-32:]
-    expected = hmac.new(key, b"enc" + nonce + ciphertext, hashlib.sha256).digest()
+    expected = hmac.new(mac_key, b"enc" + nonce + ciphertext, hashlib.sha256).digest()
     if not hmac.compare_digest(expected, tag):
         raise ValueError("Token file authentication failed")
-    return bytes(a ^ b for a, b in zip(ciphertext, _keystream(key, nonce, len(ciphertext))))
+    return bytes(a ^ b for a, b in zip(ciphertext, _keystream(enc_key, nonce, len(ciphertext))))
+
+
+def _allow_plaintext_migration() -> bool:
+    flag = (os.getenv("WHOOP_MIGRATE_PLAINTEXT_TOKEN") or "").strip().lower()
+    return flag in ("1", "true", "yes")
 
 
 def _load_token_file(path: Path, key: bytes) -> tuple[dict[str, Any], bool]:
@@ -305,6 +389,11 @@ def _load_token_file(path: Path, key: bytes) -> tuple[dict[str, Any], bool]:
     raw = path.read_bytes()
     if raw.startswith(TOKEN_FILE_PREFIX):
         return json.loads(_decrypt_token_blob(raw, key)), False
+
+    if _sealed_marker(path).exists() and not _allow_plaintext_migration():
+        raise ValueError(
+            f"Refusing plaintext WHOOP token at {path} after encrypted storage was enabled"
+        )
 
     token = json.loads(raw.decode("utf-8"))
     if not isinstance(token, dict):
@@ -319,3 +408,4 @@ def _persist_token_file(path: Path, token: dict[str, Any], key: bytes) -> None:
     tmp_path = path.with_name(path.name + ".tmp")
     tmp_path.write_bytes(blob)
     os.replace(tmp_path, path)
+    _mark_encrypted(path)

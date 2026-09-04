@@ -13,7 +13,7 @@ from fastapi import HTTPException
 
 from thaalam.db import DEFAULT_DB_PATH
 from thaalam.db import get_connection as _open_base_connection
-from thaalam.whoop_client.auth import AUTHORIZE_URL, REVOKE_URL, TOKEN_URL
+from thaalam.whoop_client.auth import AUTHORIZE_URL, REVOKE_URL, TOKEN_URL, default_token_key_path
 from thaalam.whoop_client.client import WhoopClient
 
 load_dotenv()
@@ -21,7 +21,7 @@ load_dotenv()
 DB_PATH = DEFAULT_DB_PATH
 DATA_DIR = Path(DEFAULT_DB_PATH).resolve().parent
 TOKEN_PATH = DATA_DIR / "whoop_token.json"
-TOKEN_KEY_PATH = DATA_DIR / "whoop_token.key"
+TOKEN_KEY_PATH = default_token_key_path()
 OAUTH_STATE_PATH = DATA_DIR / "whoop_oauth_state.json"
 
 # DuckDB refuses a second `connect()` to the same file with a different
@@ -41,7 +41,8 @@ def _require_db_exists() -> None:
         raise HTTPException(
             status_code=404,
             detail=(
-                "No WHOOP database found. Run `uv run main.py` once to sync data "
+                "No WHOOP database found. Connect at /api/oauth/whoop/connect "
+                "or run `uv run main.py` "
                 f"(expected at {DB_PATH})."
             ),
         )
@@ -79,9 +80,18 @@ def get_writable_connection() -> Generator[duckdb.DuckDBPyConnection, None, None
         con.close()
 
 
+def acquire_writable_connection() -> duckdb.DuckDBPyConnection:
+    """Cursor on the process-wide DuckDB connection; creates the file if needed.
+
+    Callers must `.close()` the cursor (not the base connection). Use this
+    from API routes instead of a second `duckdb.connect()`.
+    """
+    return _get_base_connection().cursor()
+
+
 def get_or_create_connection() -> Generator[duckdb.DuckDBPyConnection, None, None]:
     """Writable cursor; creates the database on first connect / OAuth backfill."""
-    con = _get_base_connection().cursor()
+    con = acquire_writable_connection()
     try:
         yield con
     finally:

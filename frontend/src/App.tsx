@@ -37,6 +37,23 @@ export default function App() {
   const { data, loading, error, reload } = useDashboardData();
   const [section, setSection] = useState<SectionId>("overview");
   const [rangeDays, setRangeDays] = useState<RangeDays>(DEFAULT_RANGE_DAYS);
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+
+  const handleRefresh = async () => {
+    setSyncing(true);
+    setSyncError(null);
+    try {
+      await api.sync();
+      await reload();
+    } catch (err) {
+      setSyncError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const displayError = syncError || error;
 
   const name =
     data?.profile.profile.first_name ||
@@ -98,18 +115,10 @@ export default function App() {
           <button
             type="button"
             className="btn ghost"
-            onClick={() =>
-              void (async () => {
-                try {
-                  await api.sync();
-                } catch {
-                  /* still reload local rows */
-                }
-                await reload();
-              })()
-            }
+            disabled={syncing}
+            onClick={() => void handleRefresh()}
           >
-            Refresh data
+            {syncing ? "Syncing…" : "Refresh data"}
           </button>
           <div className="baseline-card">
             <div className="baseline-kicker">Your baseline</div>
@@ -163,15 +172,20 @@ export default function App() {
           </div>
         )}
 
-        {error && !loading && (
+        {displayError && !loading && (
           <div className="state-panel error">
-            <h2>Could not load data</h2>
-            <p>{error}</p>
+            <h2>{syncError ? "Could not refresh WHOOP data" : "Could not load data"}</h2>
+            <p>{displayError}</p>
             <p className="muted">
-              Start the API with <code>uv run run_api.py</code>, and sync WHOOP
-              data first with <code>uv run main.py</code>.
+              Start the API with <code>uv run run_api.py</code>, connect at{" "}
+              <code>/api/oauth/whoop/connect</code>, or run{" "}
+              <code>uv run main.py</code>.
             </p>
-            <button type="button" className="btn" onClick={() => void reload()}>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => void (syncError ? handleRefresh() : reload())}
+            >
               Try again
             </button>
           </div>
