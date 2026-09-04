@@ -5,11 +5,11 @@ import type {
   DailyRecord,
   DerivedReadDiveResponse,
   DerivedReadsResponse,
-  DerivedRunwayResponse,
   InsightsResponse,
   ProfileResponse,
   RecordsResponse,
   RecoveryRecord,
+  RunwayResponse,
   SleepRecord,
   SleepStage,
   SportStrain,
@@ -53,5 +53,5 @@ export const api = {
   derivedReads: () => requestJson<DerivedReadsResponse>("/api/derived/reads"),
   derivedReadDive: (id: string) =>
     requestJson<DerivedReadDiveResponse>(`/api/derived/reads/${encodeURIComponent(id)}`),
-  derivedRunway: () => requestJson<DerivedRunwayResponse>("/api/derived/runway"),
+  derivedRunway: () => requestJson<RunwayResponse>("/api/derived/runway"),
 };

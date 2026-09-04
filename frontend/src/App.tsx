@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { HrvRhrChart } from "./components/charts/HrvRhrChart";
 import { RecoveryChart } from "./components/charts/RecoveryChart";
 import { SleepStagesChart } from "./components/charts/SleepStagesChart";
@@ -18,7 +18,9 @@ import { StrainSensitivityDive, StrainSensitivityPreview } from "./components/de
 import { GenericReadDive } from "./components/DeepDive";
 import { InsightsPanel } from "./components/InsightsPanel";
 import { ReadsTable } from "./components/ReadsTable";
+import { RunwayCard } from "./components/RunwayCard";
 import { ScoreRingCard } from "./components/ScoreRingCard";
+import { RunwayDive } from "./components/deepDives/RunwayDive";
 import { Section } from "./components/Section";
 import { SleepDetailTable } from "./components/SleepDetailTable";
 import { StatCards } from "./components/StatCards";
@@ -35,6 +37,7 @@ import type {
   SectionId,
   SportEfficiencyDelta,
   StageVarianceSlice,
+  RunwayResponse,
   StrainScatterPoint,
 } from "./types";
 import {
@@ -64,6 +67,16 @@ export default function App() {
   const [openRead, setOpenRead] = useState<string | null>(null);
   const [divePayload, setDivePayload] = useState<DerivedReadDiveResponse | null>(null);
   const [diveStatus, setDiveStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [runway, setRunway] = useState<RunwayResponse | null>(null);
+  const [runwayOpen, setRunwayOpen] = useState(false);
+
+  const loadRunway = useCallback(async () => {
+    try {
+      setRunway(await api.derivedRunway());
+    } catch {
+      setRunway(null);
+    }
+  }, []);
 
   useEffect(() => {
     if (!data) return;
@@ -71,7 +84,8 @@ export default function App() {
       .derivedReads()
       .then(setReadsPayload)
       .catch(() => setReadsPayload(null));
-  }, [data]);
+    void loadRunway();
+  }, [data, loadRunway]);
 
   useEffect(() => {
     if (!openRead) {
@@ -105,6 +119,7 @@ export default function App() {
     try {
       await api.sync();
       await reload();
+      await loadRunway();
     } catch (err) {
       setSyncError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -231,7 +246,10 @@ export default function App() {
           </div>
         </header>
 
-        {data && !loading ? <ScoreRingCard vitality={data.vitality} /> : null}
+        <div className="score-runway-row">
+          {data && !loading ? <ScoreRingCard vitality={data.vitality} /> : null}
+          <RunwayCard runway={runway} onOpen={() => setRunwayOpen(true)} />
+        </div>
 
         {loading && (
           <div className="state-panel">
@@ -366,10 +384,14 @@ export default function App() {
             )}
           </>
         )}
+      {runwayOpen && runway && (
+        <RunwayDive runway={runway} onClose={() => setRunwayOpen(false)} />
+      )}
       </main>
     </div>
   );
 }
+
 
 function ReadDive({
   read,

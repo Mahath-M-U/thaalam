@@ -1,9 +1,9 @@
 """Server-side derived metrics stored in DuckDB.
 
 The client never recomputes a baseline, slope, or projection -- it reads
-the stored `derived_baselines`, vitality, and `derived_reads` rows.
-`recompute()` stores baselines, Vitality Score, and the eleven reads from
-real WHOOP rows.
+the stored `derived_baselines`, vitality, reads, and runway rows.
+`recompute()` stores baselines, Vitality Score, eleven reads, and runway
+from real WHOOP rows.
 """
 
 from __future__ import annotations
@@ -99,8 +99,12 @@ def recompute(
     if resolved_user_id is not None:
         db.upsert_derived_baseline(con, row)
         from thaalam.services.vitality_score import persist_vitality
+        from thaalam.services.runway_service import compute_and_store_runway
 
         persist_vitality(con, user_id=resolved_user_id, now=now, baseline=row)
+        runway_payload = compute_and_store_runway(
+            con, now=now, user_id=resolved_user_id
+        )
         db.record_derived_recompute(
             con,
             resolved_user_id,
@@ -112,6 +116,7 @@ def recompute(
                 "awaiting_sleep_close": awaiting_sleep_close,
                 "bands": None,
                 "regression": None,
+                "runway_calibrating": bool(runway_payload.get("calibrating")),
             },
         )
         logger.info(
