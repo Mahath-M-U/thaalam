@@ -314,6 +314,8 @@ export interface RunwayResponse {
   baseline: number | null;
   baseline_break_date: string | null;
   days_remaining: number | null;
+  as_of: string | null;
+  computed_on: string | null;
   cone_pct: number;
   spend: RunwaySpend[];
   adaptation_window: RunwayAdaptationWindow | null;

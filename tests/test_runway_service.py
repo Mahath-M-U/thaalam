@@ -5,9 +5,16 @@ from __future__ import annotations
 import json
 from datetime import datetime, timedelta
 
+import pytest
+
 from thaalam import db
 from thaalam.services.derived_metrics import recompute
-from thaalam.services.runway_service import CONE_PCT, compute_and_store_runway, compute_runway
+from thaalam.services.runway_service import (
+    CONE_PCT,
+    _sleep_opportunity_gap,
+    compute_and_store_runway,
+    compute_runway,
+)
 
 USER_ID = 42
 _MS_H = 3_600_000
@@ -252,3 +259,71 @@ def test_compute_and_store_round_trip(tmp_db):
     assert stored is not None
     assert stored["days_remaining"] == payload["days_remaining"]
     assert stored["baseline_break_date"] == payload["baseline_break_date"]
+
+
+def test_gap_in_last_week_still_projects_real_history(tmp_db):
+    """A missing recovery in the last 7 calendar days is not short history."""
+    _seed_profile(tmp_db)
+    start = datetime(2026, 6, 1, 7, 0, 0)
+    skip = 27  # one hole inside the last week of a 30-day series
+    for i in range(30):
+        if i == skip:
+            continue
+        _seed_day(tmp_db, start + timedelta(days=i), cycle_id=400 + i, recovery=70 - (i % 5))
+    last = start + timedelta(days=29)
+    payload = compute_runway(tmp_db, now=last + timedelta(hours=6), user_id=USER_ID)
+    assert payload["calibrating"] is False
+    assert payload["present"] is True
+    hist_dates = {p["date"] for p in payload["history"]}
+    assert (start + timedelta(days=skip)).date().isoformat() not in hist_dates
+    assert last.date().isoformat() in hist_dates
+    assert payload["projection"]
+    assert payload["as_of"] == last.date().isoformat()
+
+
+def test_sleep_spend_dates_by_wake_not_bedtime(tmp_db):
+    """Main sleeps that start the evening before still land in the 7-day window."""
+    _seed_profile(tmp_db)
+    start = datetime(2026, 6, 1, 7, 0, 0)
+    for i in range(21):
+        short = i >= 14
+        _seed_day(
+            tmp_db,
+            start + timedelta(days=i),
+            cycle_id=500 + i,
+            recovery=70,
+            strain=10.0,
+            sleep_hours=5.0 if short else 8.0,
+            need_hours=8.0,
+        )
+    last = start + timedelta(days=20)
+    gap, note = _sleep_opportunity_gap(tmp_db, last.date() - timedelta(days=6), last.date())
+    assert gap == pytest.approx(3.0, abs=0.05)
+    assert "5.0h" in note
+    payload = compute_runway(tmp_db, now=last + timedelta(hours=6), user_id=USER_ID)
+    sleep_spend = next(s for s in payload["spend"] if s["label"] == "Short sleep opportunity")
+    assert sleep_spend["pct"] > 0
+
+
+def test_as_of_is_last_observed_not_clock_today(tmp_db):
+    _seed_profile(tmp_db)
+    last = _seed_future_break(tmp_db)
+    now = last + timedelta(days=3, hours=4)
+    payload = compute_runway(tmp_db, now=now, user_id=USER_ID)
+    assert payload["calibrating"] is False
+    assert payload["as_of"] == last.date().isoformat()
+    assert payload["computed_on"] == now.date().isoformat()
+    assert payload["as_of"] != payload["computed_on"]
+    assert max(p["date"] for p in payload["history"]) == last.date().isoformat()
+
+
+def test_now_bounds_future_recoveries(tmp_db):
+    _seed_profile(tmp_db)
+    start = datetime(2026, 6, 1, 7, 0, 0)
+    for i in range(30):
+        _seed_day(tmp_db, start + timedelta(days=i), cycle_id=600 + i, recovery=68)
+    cutoff = start + timedelta(days=19)
+    payload = compute_runway(tmp_db, now=cutoff + timedelta(hours=8), user_id=USER_ID)
+    assert payload["as_of"] == cutoff.date().isoformat()
+    assert max(p["date"] for p in payload["history"]) == cutoff.date().isoformat()
+    assert all(p["date"] <= cutoff.date().isoformat() for p in payload["history"])

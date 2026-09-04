@@ -45,24 +45,24 @@ def compute_runway(
 ) -> dict[str, Any]:
     """Project recovery holding the current 7-day load and sleep pattern constant."""
     now = _naive_utc(now)
-    nights = _count(
-        con, "SELECT COUNT(*) FROM sleep WHERE COALESCE(nap, FALSE) = FALSE"
-    )
-    series = _recovery_series(con)
+    until = now.date()
+    nights = _nights_as_of(con, until)
+    series = _recovery_series(con, until=until)
     if nights < CALIBRATING_NIGHTS or len(series) < MIN_FIT_POINTS:
-        return _calibrating_payload()
+        return _calibrating_payload(computed_on=until)
 
     last_date = series[-1]["date"]
-    fit = [p for p in series if p["date"] >= last_date - timedelta(days=FIT_DAYS - 1)]
+    # Last 7 *observed* recoveries (calendar gaps are not short history).
+    fit = series[-FIT_DAYS:]
     history = [p for p in series if p["date"] >= last_date - timedelta(days=HISTORY_DAYS - 1)]
-    if len(fit) < MIN_FIT_POINTS or len(history) < MIN_FIT_POINTS:
-        return _calibrating_payload()
+    if len(fit) < MIN_FIT_POINTS:
+        return _calibrating_payload(computed_on=until)
 
     baseline_rows = [
         p for p in series if p["date"] >= last_date - timedelta(days=BASELINE_DAYS - 1)
     ]
     if not baseline_rows:
-        return _calibrating_payload()
+        return _calibrating_payload(computed_on=until)
     baseline = sum(p["value"] for p in baseline_rows) / len(baseline_rows)
 
     _intercept, slope, sigma, xbar, sxx = _ols(
@@ -90,7 +90,7 @@ def compute_runway(
         horizon=horizon,
     )
 
-    spend = _spend_drivers(con, last["date"])
+    spend = _spend_drivers(con, last["date"], until=until)
     window = _adaptation_window(days_remaining, slope)
     headline, subtitle, what, cta = _copy(days_remaining, spend, window["state"])
 
@@ -104,6 +104,8 @@ def compute_runway(
         "baseline": _r(baseline),
         "baseline_break_date": break_date.isoformat() if break_date is not None else None,
         "days_remaining": days_remaining,
+        "as_of": last["date"].isoformat(),
+        "computed_on": until.isoformat(),
         "cone_pct": CONE_PCT,
         "spend": spend,
         "adaptation_window": window,
@@ -131,7 +133,7 @@ def compute_and_store_runway(
     return payload
 
 
-def _calibrating_payload() -> dict[str, Any]:
+def _calibrating_payload(*, computed_on: date | None = None) -> dict[str, Any]:
     return {
         "present": False,
         "calibrating": True,
@@ -142,6 +144,8 @@ def _calibrating_payload() -> dict[str, Any]:
         "baseline": None,
         "baseline_break_date": None,
         "days_remaining": None,
+        "as_of": None,
+        "computed_on": computed_on.isoformat() if computed_on is not None else None,
         "cone_pct": CONE_PCT,
         "spend": [],
         "adaptation_window": None,
@@ -151,7 +155,9 @@ def _calibrating_payload() -> dict[str, Any]:
     }
 
 
-def _recovery_series(con: duckdb.DuckDBPyConnection) -> list[dict[str, Any]]:
+def _recovery_series(
+    con: duckdb.DuckDBPyConnection, *, until: date
+) -> list[dict[str, Any]]:
     rows = con.execute(
         """
         SELECT r.recovery_score, r.created_at, c."start" AS cycle_start
@@ -163,7 +169,7 @@ def _recovery_series(con: duckdb.DuckDBPyConnection) -> list[dict[str, Any]]:
     by_date: dict[date, float] = {}
     for score, created_at, cycle_start in rows:
         stamped = _as_datetime(cycle_start) or _as_datetime(created_at)
-        if stamped is None:
+        if stamped is None or stamped.date() > until:
             continue
         try:
             value = float(score)
@@ -248,13 +254,16 @@ def _project(
     return points
 
 
-def _spend_drivers(con: duckdb.DuckDBPyConnection, last_date: date) -> list[dict[str, Any]]:
-    start_7 = last_date - timedelta(days=FIT_DAYS - 1)
-    start_chronic = last_date - timedelta(days=CHRONIC_STRAIN_DAYS - 1)
+def _spend_drivers(
+    con: duckdb.DuckDBPyConnection, last_date: date, *, until: date
+) -> list[dict[str, Any]]:
+    end = min(last_date, until)
+    start_7 = end - timedelta(days=FIT_DAYS - 1)
+    start_chronic = end - timedelta(days=CHRONIC_STRAIN_DAYS - 1)
     raw: list[tuple[str, float, str]] = []
 
-    strain_7, strain_28 = _mean_strain(con, start_7, last_date), _mean_strain(
-        con, start_chronic, last_date
+    strain_7, strain_28 = _mean_strain(con, start_7, end), _mean_strain(
+        con, start_chronic, end
     )
     if strain_7 is not None and strain_28 is not None:
         excess = max(0.0, strain_7 - strain_28)
@@ -265,12 +274,12 @@ def _spend_drivers(con: duckdb.DuckDBPyConnection, last_date: date) -> list[dict
         )
         raw.append((_SPEND_STRAIN, excess, note))
 
-    sleep_gap = _sleep_opportunity_gap(con, start_7, last_date)
+    sleep_gap = _sleep_opportunity_gap(con, start_7, end)
     if sleep_gap is not None:
         gap, note = sleep_gap
         raw.append((_SPEND_SLEEP, max(0.0, gap), note))
 
-    phase = _phase_drift_hours(con, last_date)
+    phase = _phase_drift_hours(con, end)
     if phase is not None:
         hours, note = phase
         raw.append((_SPEND_PHASE, max(0.0, hours), note))
@@ -338,11 +347,8 @@ def _sleep_opportunity_gap(
     in_beds: list[float] = []
     needs: list[float] = []
     for stamped, ended, _nap, stage_raw, need_raw in rows:
-        when = _as_datetime(stamped)
-        if when is None:
-            continue
-        d = when.date()
-        if d < start or d > end:
+        d = _sleep_date(stamped, ended)
+        if d is None or d < start or d > end:
             continue
         in_bed = _in_bed_hours(stamped, ended, stage_raw)
         need = _need_hours(need_raw)
@@ -381,11 +387,11 @@ def _phase_drift_hours(
     ).fetchall()
     mids: list[tuple[date, float]] = []
     for stamped, ended, offset in rows:
-        when = _as_datetime(ended) or _as_datetime(stamped)
+        d = _sleep_date(stamped, ended)
         hours = _sleep_midpoint_hours(stamped, ended, offset)
-        if when is None or hours is None:
+        if d is None or hours is None or d > last_date:
             continue
-        mids.append((when.date(), hours))
+        mids.append((d, hours))
     if not mids:
         return None
     # Newest-first from SQL; own 21-night midpoint mean.
@@ -543,9 +549,26 @@ def _pcts_sum_100(shares: list[float]) -> list[int]:
     return rounded
 
 
-def _count(con: duckdb.DuckDBPyConnection, sql: str) -> int:
-    row = con.execute(sql).fetchone()
-    return int(row[0]) if row and row[0] is not None else 0
+def _sleep_date(start: Any, end: Any) -> date | None:
+    """Wake date (sleep end), matching recovery/cycle days — not the evening start."""
+    when = _as_datetime(end) or _as_datetime(start)
+    return when.date() if when is not None else None
+
+
+def _nights_as_of(con: duckdb.DuckDBPyConnection, until: date) -> int:
+    rows = con.execute(
+        """
+        SELECT "start", "end"
+        FROM sleep
+        WHERE COALESCE(nap, FALSE) = FALSE
+        """
+    ).fetchall()
+    n = 0
+    for stamped, ended in rows:
+        d = _sleep_date(stamped, ended)
+        if d is not None and d <= until:
+            n += 1
+    return n
 
 
 def _as_obj(raw: Any) -> Any:

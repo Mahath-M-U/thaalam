@@ -88,7 +88,11 @@ export function RunwayDive({ runway, onClose }: Props) {
           </section>
         )}
 
-        {!runway.calibrating && <button type="button" className="btn runway-cta">{cta}</button>}
+        {!runway.calibrating && cta && (
+          <p className="btn runway-cta" role="note">
+            {cta}
+          </p>
+        )}
 
         {runway.methodology && <p className="runway-method">{runway.methodology}</p>}
       </div>

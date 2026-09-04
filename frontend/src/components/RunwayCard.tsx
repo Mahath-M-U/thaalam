@@ -1,6 +1,7 @@
 import { Area, ComposedChart, Line, ReferenceLine, ResponsiveContainer, YAxis } from "recharts";
 import { AMBER } from "../chartTheme";
 import type { RunwayResponse } from "../types";
+import { shortDate } from "../utils";
 
 interface ChartRow {
   date: string;
@@ -56,14 +57,16 @@ export function runwayAxisLabels(runway: RunwayResponse): { back: string; mid: s
     return { back: "", mid: "today", forward: "" };
   }
   const first = history[0].date;
-  const today = history[history.length - 1].date;
-  const backDays = Math.max(0, dayDiff(first, today));
-  const lastProj = projection.length ? projection[projection.length - 1].date : today;
-  const fwd = Math.max(0, dayDiff(today, lastProj));
+  const origin = runway.as_of ?? history[history.length - 1].date;
+  const backDays = Math.max(0, dayDiff(first, origin));
+  const lastProj = projection.length ? projection[projection.length - 1].date : origin;
+  const fwd = Math.max(0, dayDiff(origin, lastProj));
+  const mid =
+    runway.computed_on && origin === runway.computed_on ? "today" : shortDate(origin);
   return {
     back: `${backDays} days back`,
-    mid: "today",
-    forward: fwd > 0 ? `+${fwd} days projected` : "today",
+    mid,
+    forward: fwd > 0 ? `+${fwd} days projected` : mid,
   };
 }
 
@@ -153,15 +156,16 @@ export function RunwayChart({ runway, height = 180 }: { runway: RunwayResponse; 
 }
 
 function titleParts(runway: RunwayResponse): { lead: string; rest: string } {
+  const subtitle = (runway.subtitle ?? "").trim();
+  const headline = (runway.headline ?? "").trim();
   if (runway.calibrating) {
-    return { lead: "Calibrating", rest: runway.subtitle ?? "need 14 nights to project a runway" };
+    return { lead: "", rest: "" };
   }
-  if (runway.days_remaining == null) {
-    return { lead: "Holding", rest: runway.subtitle ?? "at this load" };
+  const split = subtitle.match(/^((?:≈\s*)?\d+\s+days?)\b[,\s]*(.*)$/i);
+  if (split) {
+    return { lead: split[1], rest: split[2] };
   }
-  const n = runway.days_remaining;
-  const unit = n === 1 ? "day" : "days";
-  return { lead: `${n} ${unit}`, rest: "before your baseline is projected to break" };
+  return { lead: headline, rest: subtitle };
 }
 
 interface Props {
@@ -176,32 +180,43 @@ export function RunwayCard({ runway, onOpen }: Props) {
   const hasChart = !runway.calibrating && runway.history.length > 0;
 
   return (
-    <article className="runway-card">
-      <button type="button" className="runway-card-hit" onClick={onOpen}>
-        <header className="runway-card-header">
-          <div>
-            <div className="runway-kicker">Recovery sustainability runway</div>
+    <article className="runway-card" onClick={onOpen}>
+      <header className="runway-card-header">
+        <div>
+          <div className="runway-kicker">Recovery sustainability runway</div>
+          {(parts.lead || parts.rest) && (
             <h2 className="runway-title">
-              <strong>{parts.lead}</strong> {parts.rest}
+              {parts.lead ? <strong>{parts.lead}</strong> : null}
+              {parts.rest ? ` ${parts.rest}` : null}
             </h2>
+          )}
+        </div>
+        <div className="runway-chrome">
+          <div>
+            <span>Window</span>
+            <strong>{windowState ?? "—"}</strong>
           </div>
-          <div className="runway-chrome">
-            <div>
-              <span>Window</span>
-              <strong>{windowState ?? "—"}</strong>
-            </div>
-            <div>
-              <span>Cone</span>
-              <strong>{runway.cone_pct}%</strong>
-            </div>
+          <div>
+            <span>Cone</span>
+            <strong>{runway.cone_pct}%</strong>
           </div>
-        </header>
-        {hasChart ? (
-          <RunwayChart runway={runway} height={188} />
-        ) : (
-          <p className="runway-calibrating">{runway.subtitle}</p>
-        )}
-      </button>
+          <button
+            type="button"
+            className="runway-open"
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpen();
+            }}
+          >
+            Open
+          </button>
+        </div>
+      </header>
+      {hasChart ? (
+        <RunwayChart runway={runway} height={188} />
+      ) : (
+        <p className="runway-calibrating">{runway.subtitle}</p>
+      )}
     </article>
   );
 }
