@@ -1,20 +1,49 @@
 import { useState } from "react";
-import type { VitalityPart, VitalityResponse } from "../types";
+import type { VitalityPart, VitalityResponse, VitalitySupporting } from "../types";
 import { ScoreRing, VitalityDeepDive } from "./VitalityDeepDive";
 
 interface Props {
   vitality: VitalityResponse;
 }
 
-export function ScoreRingCard({ vitality }: Props) {
-  const [diveOpen, setDiveOpen] = useState(false);
-  const score = vitality.score;
-  const dimmed = vitality.sleep_not_closed;
-  const supporting = vitality.supporting;
+export function ScoreMeters({
+  supporting,
+}: {
+  supporting: VitalitySupporting | null | undefined;
+}) {
   const strain = supporting?.day_strain ?? null;
   const strainMax = supporting?.day_strain_max ?? 21;
   const yieldPct = supporting?.sleep_yield ?? null;
   const rhr = supporting?.resting_hr ?? null;
+
+  return (
+    <div className="score-meters">
+      <Meter
+        label="Day strain"
+        display={strain == null ? "—" : `${strain.toFixed(1)} / ${strainMax}`}
+        fill={strain == null ? 0 : Math.max(0, Math.min(1, strain / strainMax))}
+        tone="white"
+      />
+      <Meter
+        label="Sleep yield"
+        display={yieldPct == null ? "—" : `${Math.round(yieldPct)}%`}
+        fill={yieldPct == null ? 0 : Math.max(0, Math.min(1, yieldPct / 100))}
+        tone="amber"
+      />
+      <Meter
+        label="Resting HR"
+        display={rhr == null ? "—" : `${Math.round(rhr)} bpm`}
+        fill={rhr == null ? 0 : Math.max(0, Math.min(1, (80 - rhr) / 40))}
+        tone="white"
+      />
+    </div>
+  );
+}
+
+export function ScoreRingCard({ vitality }: Props) {
+  const [diveOpen, setDiveOpen] = useState(false);
+  const score = vitality.score;
+  const dimmed = vitality.sleep_not_closed;
 
   return (
     <>
@@ -27,26 +56,7 @@ export function ScoreRingCard({ vitality }: Props) {
         >
           <div className="score-ring-top">
             <ScoreRing score={score} dimmed={dimmed} />
-            <div className="score-meters">
-              <Meter
-                label="Day strain"
-                display={strain == null ? "—" : `${strain.toFixed(1)} / ${strainMax}`}
-                fill={strain == null ? 0 : Math.max(0, Math.min(1, strain / strainMax))}
-                tone="white"
-              />
-              <Meter
-                label="Sleep yield"
-                display={yieldPct == null ? "—" : `${Math.round(yieldPct)}%`}
-                fill={yieldPct == null ? 0 : Math.max(0, Math.min(1, yieldPct / 100))}
-                tone="amber"
-              />
-              <Meter
-                label="Resting HR"
-                display={rhr == null ? "—" : `${Math.round(rhr)} bpm`}
-                fill={rhr == null ? 0 : Math.max(0, Math.min(1, (80 - rhr) / 40))}
-                tone="white"
-              />
-            </div>
+            <ScoreMeters supporting={vitality.supporting} />
           </div>
 
           <div className="score-ring-meta">

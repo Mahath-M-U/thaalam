@@ -10,12 +10,13 @@ const GROUPS: { id: ReadGroup; label: string }[] = [
 interface Props {
   reads: DerivedRead[];
   onOpen: (id: string) => void;
+  heading?: string | null;
 }
 
-export function ReadsTable({ reads, onOpen }: Props) {
+export function ReadsTable({ reads, onOpen, heading = "All eleven reads" }: Props) {
   return (
     <section id="reads" className="section reads-section">
-      <h2 className="section-title">All eleven reads</h2>
+      {heading ? <h2 className="section-title">{heading}</h2> : null}
       {GROUPS.map((group) => {
         const rows = reads.filter((read) => read.group === group.id);
         if (rows.length === 0) return null;

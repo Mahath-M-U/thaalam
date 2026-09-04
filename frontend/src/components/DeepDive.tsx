@@ -12,6 +12,7 @@ interface Props {
   onBack: () => void;
   hero?: ReactNode;
   children?: ReactNode;
+  className?: string;
 }
 
 function asMeaning(text?: string | null): string | null {
@@ -32,10 +33,11 @@ export function DeepDive({
   onBack,
   hero,
   children,
+  className,
 }: Props) {
   const meaningText = asMeaning(meaning) || asMeaning(finding);
   return (
-    <article className="deep-dive">
+    <article className={className ? `deep-dive ${className}` : "deep-dive"}>
       <button type="button" className="deep-dive-back" onClick={onBack}>
         ← Back
       </button>

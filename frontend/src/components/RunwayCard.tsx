@@ -188,16 +188,33 @@ function titleParts(runway: RunwayResponse): { lead: string; rest: string } {
 interface Props {
   runway: RunwayResponse | null;
   onOpen: () => void;
+  compact?: boolean;
 }
 
-export function RunwayCard({ runway, onOpen }: Props) {
+export function RunwayCard({ runway, onOpen, compact = false }: Props) {
   if (!runway) return null;
   const parts = titleParts(runway);
   const windowState = runway.adaptation_window?.state ?? (runway.calibrating ? "—" : null);
   const hasChart = !runway.calibrating && runway.history.length > 0;
 
   return (
-    <article className="runway-card" onClick={onOpen}>
+    <article
+      className={`runway-card${compact ? " is-compact" : ""}`}
+      onClick={onOpen}
+      onKeyDown={
+        compact
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onOpen();
+              }
+            }
+          : undefined
+      }
+      role={compact ? "button" : undefined}
+      tabIndex={compact ? 0 : undefined}
+      aria-label={compact ? "Open recovery sustainability runway" : undefined}
+    >
       <header className="runway-card-header">
         <div>
           <div className="runway-kicker">Recovery sustainability runway</div>
@@ -208,29 +225,35 @@ export function RunwayCard({ runway, onOpen }: Props) {
             </h2>
           )}
         </div>
-        <div className="runway-chrome">
-          <div>
-            <span>Window</span>
-            <strong>{windowState ?? "—"}</strong>
+        {compact ? (
+          <span className="read-chevron" aria-hidden="true">
+            ›
+          </span>
+        ) : (
+          <div className="runway-chrome">
+            <div>
+              <span>Window</span>
+              <strong>{windowState ?? "—"}</strong>
+            </div>
+            <div>
+              <span>Cone</span>
+              <strong>{runway.cone_pct}%</strong>
+            </div>
+            <button
+              type="button"
+              className="runway-open"
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpen();
+              }}
+            >
+              Open
+            </button>
           </div>
-          <div>
-            <span>Cone</span>
-            <strong>{runway.cone_pct}%</strong>
-          </div>
-          <button
-            type="button"
-            className="runway-open"
-            onClick={(event) => {
-              event.stopPropagation();
-              onOpen();
-            }}
-          >
-            Open
-          </button>
-        </div>
+        )}
       </header>
       {hasChart ? (
-        <RunwayChart runway={runway} height={188} />
+        <RunwayChart runway={runway} height={compact ? 148 : 188} />
       ) : (
         <p className="runway-calibrating">{runway.subtitle}</p>
       )}

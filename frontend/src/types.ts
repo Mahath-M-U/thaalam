@@ -155,6 +155,8 @@ export type SectionId =
   | "sleep"
   | "workouts";
 
+export type MobileTab = "today" | "reads" | "runway";
+
 export interface InsightCard {
   id: string;
   title: string;

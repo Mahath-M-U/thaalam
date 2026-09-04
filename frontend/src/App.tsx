@@ -17,6 +17,10 @@ import { StageDependencyDive, StageDependencyPreview } from "./components/deepDi
 import { StrainSensitivityDive, StrainSensitivityPreview } from "./components/deepDives/StrainSensitivityDive";
 import { GenericReadDive } from "./components/DeepDive";
 import { InsightsPanel } from "./components/InsightsPanel";
+import { MobileShell, useIsMobile } from "./components/mobile/MobileShell";
+import { ReadsView } from "./components/mobile/ReadsView";
+import { RunwayView } from "./components/mobile/RunwayView";
+import { TodayView } from "./components/mobile/TodayView";
 import { ReadsTable } from "./components/ReadsTable";
 import { RunwayCard } from "./components/RunwayCard";
 import { ScoreRingCard } from "./components/ScoreRingCard";
@@ -25,13 +29,14 @@ import { Section } from "./components/Section";
 import { SleepDetailTable } from "./components/SleepDetailTable";
 import { StatCards } from "./components/StatCards";
 import { api } from "./api";
-import { useDashboardData } from "./hooks/useDashboardData";
+import { EMPTY_VITALITY, useDashboardData } from "./hooks/useDashboardData";
 import type {
   CardiacSportDive,
   DerivedRead,
   DerivedReadDiveResponse,
   DerivedReadsResponse,
   HyperarousalPoint,
+  MobileTab,
   PhaseCalendarCell,
   PhasePenaltyBar,
   SectionId,
@@ -59,7 +64,9 @@ const NAV: { id: SectionId | "reads"; label: string }[] = [
 
 export default function App() {
   const { data, loading, error, reload } = useDashboardData();
+  const isMobile = useIsMobile();
   const [section, setSection] = useState<SectionId | "reads">("overview");
+  const [mobileTab, setMobileTab] = useState<MobileTab>("today");
   const [rangeDays, setRangeDays] = useState<RangeDays>(DEFAULT_RANGE_DAYS);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -163,6 +170,79 @@ export default function App() {
     | { sports?: SportEfficiencyDelta[] }
     | undefined;
   const efficiencyDeltas = cardiacPreview?.sports ?? [];
+
+  const setMobileTabAndClear = (next: MobileTab) => {
+    setMobileTab(next);
+    setOpenRead(null);
+    setRunwayOpen(false);
+  };
+
+  const readDive = openRead ? (
+    divePayload?.read ? (
+      <ReadDive
+        read={divePayload.read}
+        dive={divePayload.dive}
+        onBack={() => setOpenRead(null)}
+      />
+    ) : diveStatus === "error" ? (
+      <div className="state-panel error">
+        <button type="button" className="deep-dive-back" onClick={() => setOpenRead(null)}>
+          ← Back
+        </button>
+        <h2>Could not load this read</h2>
+        <p>That deep dive is not available yet. Try again after a refresh, or pick another read.</p>
+      </div>
+    ) : (
+      <div className="state-panel">
+        <button type="button" className="deep-dive-back" onClick={() => setOpenRead(null)}>
+          ← Back
+        </button>
+        <div className="spinner" />
+        <p>Loading your baseline…</p>
+      </div>
+    )
+  ) : null;
+
+  if (isMobile) {
+    return (
+      <MobileShell tab={mobileTab} onTab={setMobileTabAndClear} overlay={readDive}>
+        {loading && !data ? (
+          <div className="state-panel">
+            <div className="spinner" />
+            <p>Loading your baseline…</p>
+          </div>
+        ) : displayError && !data ? (
+          <div className="state-panel error">
+            <h2>{syncError ? "Could not refresh WHOOP data" : "Could not load data"}</h2>
+            <p>{displayError}</p>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => void (syncError ? handleRefresh() : reload())}
+            >
+              Try again
+            </button>
+          </div>
+        ) : mobileTab === "reads" ? (
+          <ReadsView reads={reads} onOpen={setOpenRead} />
+        ) : mobileTab === "runway" ? (
+          <RunwayView runway={runway} />
+        ) : (
+          <TodayView
+            vitality={data?.vitality ?? EMPTY_VITALITY}
+            brief={data?.dailyBrief ?? null}
+            reads={reads}
+            runway={runway}
+            onOpenRead={setOpenRead}
+            onOpenReads={() => setMobileTabAndClear("reads")}
+            onOpenRunway={() => setMobileTabAndClear("runway")}
+            onRefresh={() => void handleRefresh()}
+            syncing={syncing}
+          />
+        )}
+      </MobileShell>
+    );
+  }
 
   return (
     <div className="app">
@@ -283,30 +363,8 @@ export default function App() {
               <StatCards stats={data.summary.stats} latest={data.summary.latest} />
             </div>
 
-            {openRead ? (
-              divePayload?.read ? (
-              <ReadDive
-                read={divePayload.read}
-                dive={divePayload.dive}
-                onBack={() => setOpenRead(null)}
-              />
-              ) : diveStatus === "error" ? (
-                <div className="state-panel error">
-                  <button type="button" className="deep-dive-back" onClick={() => setOpenRead(null)}>
-                    ← Back
-                  </button>
-                  <h2>Could not load this read</h2>
-                  <p>That deep dive is not available yet. Try again after a refresh, or pick another read.</p>
-                </div>
-              ) : (
-                <div className="state-panel">
-                  <button type="button" className="deep-dive-back" onClick={() => setOpenRead(null)}>
-                    ← Back
-                  </button>
-                  <div className="spinner" />
-                  <p>Loading your baseline…</p>
-                </div>
-              )
+            {readDive ? (
+              readDive
             ) : (
               <>
             <InsightsPanel
