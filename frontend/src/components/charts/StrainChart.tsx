@@ -60,7 +60,7 @@ export function StrainChart({ records }: Props) {
             type="monotone"
             dataKey="strain"
             name="Strain"
-            stroke={CHART_COLORS.strain}
+            stroke={CHART_COLORS.amber}
             strokeWidth={2}
             fill={AMBER_14}
             dot={false}

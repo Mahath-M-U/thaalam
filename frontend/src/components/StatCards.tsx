@@ -1,5 +1,5 @@
 import type { LatestMetrics, StatCard } from "../types";
-import { formatNumber, recoveryBand, recoveryColor } from "../utils";
+import { formatNumber, recoveryColor } from "../utils";
 
 interface Props {
   stats: StatCard[];
@@ -17,9 +17,8 @@ export function StatCards({ stats, latest }: Props) {
           {formatNumber(recovery, 0)}
         </div>
         <div className="stat-sub">
-          {recoveryBand(recovery)}
           {latest.cycle_start
-            ? ` · ${new Date(latest.cycle_start).toLocaleDateString()}`
+            ? new Date(latest.cycle_start).toLocaleDateString()
             : ""}
         </div>
       </div>

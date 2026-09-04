@@ -88,7 +88,7 @@ export function SleepVsRecoveryChart({ daily, insights, rangeDays }: Props) {
     <>
       <ChartCard
         title="Sleep vs recovery comparison"
-        description="How sleep performance lines up with the same-day recovery score (Pearson r + good vs poor nights)."
+        description="All history · how sleep performance lines up with same-day recovery (Pearson r + good vs poor nights). Scatter and dual-line below follow the selected range."
         wide
       >
         <div className="compare-stats">
@@ -97,7 +97,7 @@ export function SleepVsRecoveryChart({ daily, insights, rangeDays }: Props) {
             <strong className={corr != null && corr >= 0.3 ? "pos" : ""}>
               {corr != null ? `r = ${corr >= 0 ? "+" : ""}${corr.toFixed(2)}` : "—"}
             </strong>
-            <em>{strength} · n = {n ?? scatter.length}</em>
+            <em>All history · {strength} · n = {n ?? "—"}</em>
           </div>
           <div className="compare-stat">
             <span>Recovery after good sleep</span>
@@ -195,7 +195,7 @@ export function SleepVsRecoveryChart({ daily, insights, rangeDays }: Props) {
       {buckets.length > 0 && (
         <ChartCard
           title="Recovery by sleep quality bucket"
-          description="Average recovery after poor / average / good sleep performance nights."
+          description="All history · average recovery after poor / average / good sleep performance nights."
         >
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={buckets} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
@@ -224,7 +224,7 @@ export function SleepVsRecoveryChart({ daily, insights, rangeDays }: Props) {
               <Bar
                 dataKey="avg_sleep_performance"
                 name="Avg sleep %"
-                fill={CHART_COLORS.sleep}
+                fill={CHART_COLORS.hrv}
                 radius={[6, 6, 0, 0]}
               />
             </BarChart>
@@ -261,7 +261,7 @@ export function SleepVsRecoveryChart({ daily, insights, rangeDays }: Props) {
                 type="monotone"
                 dataKey="sleep_performance"
                 name="Sleep performance %"
-                stroke={CHART_COLORS.sleep}
+                stroke={CHART_COLORS.hrv}
                 strokeWidth={2}
                 dot={false}
                 connectNulls

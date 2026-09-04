@@ -11,7 +11,7 @@ export function formatNumber(value: number | null | undefined, digits = 1): stri
   return value.toFixed(digits);
 }
 
-/** Amber opacity ladder: in-band full amber, farther from band more faded. */
+/** Temporary 34/67 opacity ladder until personal bands exist. Not an own-band. */
 export function recoveryColor(score: number | null | undefined): string {
   if (score == null || Number.isNaN(score)) return "#8A8A8A";
   if (score < 34) return "rgba(255,196,0,0.35)";
@@ -19,11 +19,47 @@ export function recoveryColor(score: number | null | undefined): string {
   return "#FFC400";
 }
 
-export function recoveryBand(score: number | null | undefined): string {
-  if (score == null || Number.isNaN(score)) return "—";
-  if (score < 34) return "Low";
-  if (score < 67) return "Moderate";
-  return "High";
+const TRI_SCALE_REWRITES: [RegExp, string][] = [
+  [/in the green recovery zone/gi, "in-band"],
+  [/in the yellow recovery zone/gi, "out-of-band"],
+  [/in the red recovery zone/gi, "out-of-band"],
+  [/green recovery streak/gi, "in-band streak"],
+  [/green recovery band/gi, "in-band"],
+  [/green recovery zone/gi, "in-band"],
+  [/yellow recovery zone/gi, "out-of-band"],
+  [/red recovery zone/gi, "out-of-band"],
+  [/historical green run/gi, "historical in-band run"],
+  [/current green streak/gi, "current in-band streak"],
+  [/green streak/gi, "in-band streak"],
+  [/sub-green days/gi, "out-of-band days"],
+  [/yellow\/red days/gi, "out-of-band days"],
+  [/yellow\/red/gi, "out-of-band"],
+  [/below green/gi, "out-of-band"],
+  [/few green days/gi, "few in-band days"],
+  [/green days/gi, "in-band days"],
+  [/sit in yellow/gi, "sit out-of-band"],
+  [/in the green zone/gi, "in-band"],
+  [/in the yellow zone/gi, "out-of-band"],
+  [/in the red zone/gi, "out-of-band"],
+  [/into a green streak/gi, "into an in-band streak"],
+  [/into a yellow streak/gi, "into an out-of-band streak"],
+  [/into a red streak/gi, "into an out-of-band streak"],
+  [/a green streak/gi, "an in-band streak"],
+  [/a yellow streak/gi, "an out-of-band streak"],
+  [/a red streak/gi, "an out-of-band streak"],
+  [/(\d+(?:\.\d+)?)%\s*green\b/gi, "$1% in-band"],
+  [/(\d+)\s+green\b/gi, "$1 in-band"],
+  [/(\d+)\s+yellow\b/gi, "$1 out-of-band"],
+  [/(\d+)\s+red\b/gi, "$1 out-of-band"],
+  [/\bgreen\b/gi, "in-band"],
+  [/\byellow\b/gi, "out-of-band"],
+  [/\bred\b/gi, "out-of-band"],
+];
+
+/** Map WHOOP green/yellow/red copy to in-band / out-of-band at render time. */
+export function rewriteTriScaleCopy(text: string | null | undefined): string {
+  if (!text) return "";
+  return TRI_SCALE_REWRITES.reduce((s, [pattern, replacement]) => s.replace(pattern, replacement), text);
 }
 
 export const RANGE_OPTIONS = [14, 21, 45, 90] as const;

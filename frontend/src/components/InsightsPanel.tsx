@@ -1,4 +1,5 @@
 import {
+  Area,
   Bar,
   BarChart,
   CartesianGrid,
@@ -14,11 +15,12 @@ import {
   YAxis,
 } from "recharts";
 import type { InsightsResponse, DailyBriefResponse } from "../types";
-import { isWithinDays, shortDate } from "../utils";
+import { isWithinDays, rewriteTriScaleCopy, shortDate } from "../utils";
 import { ChartCard } from "./ChartCard";
 import { DailyBriefCard } from "./DailyBriefCard";
 import { Section } from "./Section";
 import {
+  AMBER,
   CHART_COLORS,
   axisLine,
   axisTick,
@@ -40,7 +42,9 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays }: Props) {
       <Section id="insights" title="Insights">
         <DailyBriefCard brief={dailyBrief} />
         <ChartCard title="Derived insights">
-          <p className="empty-chart">{insights.message ?? "Not enough data yet."}</p>
+          <p className="empty-chart">
+            {rewriteTriScaleCopy(insights.message) || "Not enough data yet."}
+          </p>
         </ChartCard>
       </Section>
     );
@@ -53,6 +57,8 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays }: Props) {
     .map((r) => ({
       ...r,
       label: shortDate(r.date),
+      bandLo: r.baseline * 0.9,
+      bandSpan: r.baseline * 0.2,
     }));
   const acwrSeries = (sections.training_load?.series ?? [])
     .filter((r) => inWindow(r.date))
@@ -95,12 +101,12 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays }: Props) {
         {insights.cards.map((card) => (
           <article key={card.id} className={`insight-card tone-${card.tone}`}>
             <div className="insight-card-top">
-              <span className="insight-status">{card.status}</span>
-              <h3>{card.title}</h3>
+              <span className="insight-status">{rewriteTriScaleCopy(card.status)}</span>
+              <h3>{rewriteTriScaleCopy(card.title)}</h3>
             </div>
-            <div className="insight-value">{card.value}</div>
-            <div className="insight-sub">{card.subtitle}</div>
-            <p>{card.detail}</p>
+            <div className="insight-value">{rewriteTriScaleCopy(card.value)}</div>
+            <div className="insight-sub">{rewriteTriScaleCopy(card.subtitle)}</div>
+            <p>{rewriteTriScaleCopy(card.detail)}</p>
           </article>
         ))}
       </div>
@@ -129,6 +135,26 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays }: Props) {
               />
               <Tooltip contentStyle={tooltipStyle} />
               <Legend wrapperStyle={legendStyle} />
+              <Area
+                type="monotone"
+                dataKey="bandLo"
+                stackId="norm"
+                stroke="none"
+                fill="transparent"
+                legendType="none"
+                tooltipType="none"
+              />
+              <Area
+                type="monotone"
+                dataKey="bandSpan"
+                stackId="norm"
+                name="±10% of baseline"
+                stroke="none"
+                fill={AMBER}
+                fillOpacity={0.08}
+                legendType="none"
+                tooltipType="none"
+              />
               <Line
                 type="monotone"
                 dataKey="hrv"
@@ -183,7 +209,7 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays }: Props) {
                 type="monotone"
                 dataKey="acwr"
                 name="ACWR"
-                stroke={CHART_COLORS.strain}
+                stroke={CHART_COLORS.amber}
                 strokeWidth={2}
                 dot={false}
               />
@@ -195,7 +221,7 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays }: Props) {
       {lagBuckets.length > 0 && (
         <ChartCard
           title="Next-day recovery by prior strain"
-          description="Average recovery the day after low / medium / high strain."
+          description="All history · average recovery the day after low / medium / high strain."
         >
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={lagBuckets} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
@@ -228,21 +254,21 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays }: Props) {
       {zonePct && (
         <ChartCard
           title="Recovery zone mix"
-          description="Share of days in low / moderate / high recovery bands."
+          description="All history · share of days by recovery score as an amber opacity ladder."
         >
           <ResponsiveContainer width="100%" height={260}>
             <BarChart
               data={[
-                { zone: "Low", pct: zonePct.red, fill: CHART_COLORS.recoveryLow },
-                { zone: "Moderate", pct: zonePct.yellow, fill: CHART_COLORS.recoveryMid },
-                { zone: "High", pct: zonePct.green, fill: CHART_COLORS.recoveryHigh },
+                { zone: "a", pct: zonePct.red, fill: CHART_COLORS.recoveryLow },
+                { zone: "b", pct: zonePct.yellow, fill: CHART_COLORS.recoveryMid },
+                { zone: "c", pct: zonePct.green, fill: CHART_COLORS.recoveryHigh },
               ]}
               margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
               <XAxis
                 dataKey="zone"
-                tick={axisTick}
+                tick={false}
                 axisLine={axisLine}
                 tickLine={false}
               />
@@ -253,7 +279,11 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays }: Props) {
                 tickLine={false}
                 width={40}
               />
-              <Tooltip contentStyle={tooltipStyle} />
+              <Tooltip
+                contentStyle={tooltipStyle}
+                labelFormatter={() => ""}
+                formatter={(value) => [value, "% of days"]}
+              />
               <Bar dataKey="pct" name="% of days" radius={[6, 6, 0, 0]}>
                 <Cell fill={CHART_COLORS.recoveryLow} />
                 <Cell fill={CHART_COLORS.recoveryMid} />
@@ -263,15 +293,15 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays }: Props) {
           </ResponsiveContainer>
           <ul className="stage-legend">
             <li>
-              <span className="swatch" style={{ background: CHART_COLORS.recoveryLow }} /> Low{" "}
+              <span className="swatch" style={{ background: CHART_COLORS.recoveryLow }} />
               <em>{zonePct.red}%</em>
             </li>
             <li>
-              <span className="swatch" style={{ background: CHART_COLORS.recoveryMid }} /> Moderate{" "}
+              <span className="swatch" style={{ background: CHART_COLORS.recoveryMid }} />
               <em>{zonePct.yellow}%</em>
             </li>
             <li>
-              <span className="swatch" style={{ background: CHART_COLORS.recoveryHigh }} /> High{" "}
+              <span className="swatch" style={{ background: CHART_COLORS.recoveryHigh }} />
               <em>{zonePct.green}%</em>
             </li>
           </ul>
@@ -283,6 +313,7 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays }: Props) {
           title="Weekday patterns"
           description={
             [
+              "All history",
               sections.weekday_patterns?.best_recovery_day
                 ? `Best recovery: ${sections.weekday_patterns.best_recovery_day}`
                 : null,
@@ -291,7 +322,7 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays }: Props) {
                 : null,
             ]
               .filter(Boolean)
-              .join(" · ") || "Average recovery and strain by day of week."
+              .join(" · ") || "All history · average recovery and strain by day of week."
           }
           wide
         >
@@ -458,7 +489,7 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays }: Props) {
       )}
 
       {insights.disclaimer && (
-        <p className="insight-disclaimer wide">{insights.disclaimer}</p>
+        <p className="insight-disclaimer wide">{rewriteTriScaleCopy(insights.disclaimer)}</p>
       )}
     </Section>
   );

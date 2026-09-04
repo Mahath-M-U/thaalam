@@ -1,4 +1,4 @@
-/** Shared Recharts styling — true-black + amber Mahath tokens. */
+/** Shared Recharts tokens. Dual series must stay white vs amber. */
 
 export const AMBER = "#FFC400";
 export const AMBER_60 = "rgba(255,196,0,0.6)";
@@ -11,7 +11,7 @@ export const CHART_COLORS = {
   recoveryLow: AMBER_35,
   recoveryMid: AMBER_60,
   recoveryHigh: AMBER,
-  strain: AMBER,
+  strain: "#FFFFFF",
   sleep: AMBER_60,
   hrv: "#FFFFFF",
   rhr: AMBER,

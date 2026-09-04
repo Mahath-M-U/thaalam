@@ -37,7 +37,7 @@ export function RecoveryChart({ records }: Props) {
   return (
     <ChartCard
       title="Recovery score over time"
-      description="Daily recovery (0–100) with an amber own-band wash."
+      description="Daily recovery (0–100) with a full-plot amber 8% wash until personal bands exist."
       wide
     >
       <ResponsiveContainer width="100%" height={280}>

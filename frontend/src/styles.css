@@ -683,30 +683,6 @@ code {
   cursor: pointer;
 }
 
-.limit-btns {
-  display: flex;
-  gap: 0.35rem;
-}
-
-.limit-btns button {
-  appearance: none;
-  border: 1px solid var(--hairline);
-  background: transparent;
-  color: var(--body);
-  border-radius: var(--radius-pill);
-  padding: 0.3rem 0.7rem;
-  font: inherit;
-  font-size: 0.8rem;
-  cursor: pointer;
-}
-
-.limit-btns button.active,
-.limit-btns button:hover {
-  border-color: var(--amber);
-  color: var(--on-primary);
-  background: var(--amber);
-}
-
 .table-scroll {
   overflow-x: auto;
   margin: 0 -0.25rem 0.5rem;

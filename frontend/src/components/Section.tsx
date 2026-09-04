@@ -3,7 +3,6 @@ import type { ReactNode } from "react";
 interface Props {
   id: string;
   title: string;
-  accent?: string;
   children: ReactNode;
 }
 

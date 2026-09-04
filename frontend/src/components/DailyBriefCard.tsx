@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api } from "../api";
 import type { DailyBriefResponse } from "../types";
+import { rewriteTriScaleCopy } from "../utils";
 import { ChartCard } from "./ChartCard";
 
 interface Props {
@@ -55,7 +56,9 @@ export function DailyBriefCard({ brief }: Props) {
       wide
     >
       <p className="brief-text">
-        {brief.ready ? brief.brief : (brief.message ?? "Not enough data yet.")}
+        {brief.ready
+          ? rewriteTriScaleCopy(brief.brief)
+          : (rewriteTriScaleCopy(brief.message) || "Not enough data yet.")}
       </p>
 
       {brief.ready && (
@@ -75,7 +78,9 @@ export function DailyBriefCard({ brief }: Props) {
                   {answers[q.key]?.error && (
                     <span className="brief-answer-error">{answers[q.key]?.error}</span>
                   )}
-                  {answers[q.key]?.answer && <p>{answers[q.key]?.answer}</p>}
+                  {answers[q.key]?.answer && (
+                    <p>{rewriteTriScaleCopy(answers[q.key]?.answer)}</p>
+                  )}
                 </div>
               )}
             </div>
