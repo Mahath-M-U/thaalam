@@ -238,7 +238,9 @@ class WhoopAuth:
 
 
 def default_token_key_path() -> Path:
-    env_file = (os.getenv("WHOOP_TOKEN_KEY_FILE") or "").strip()
+    from thaalam.config import clean_env_value
+
+    env_file = clean_env_value(os.getenv("WHOOP_TOKEN_KEY_FILE"))
     if env_file:
         return Path(env_file)
     return Path.home() / ".thaalam" / "whoop_token.key"
@@ -331,6 +333,10 @@ def _mark_encrypted(token_path: Path) -> None:
 
 def _parse_token_key(value: str) -> bytes:
     text = value.strip()
+    # Tolerate Dokploy-pasted quotes: WHOOP_TOKEN_KEY='"abc..."' would
+    # otherwise fail base64 decoding with a confusing error.
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in ("'", '"'):
+        text = text[1:-1].strip()
     if len(text) == 64 and all(c in "0123456789abcdefABCDEF" for c in text):
         return bytes.fromhex(text)
     padded = text + "=" * (-len(text) % 4)

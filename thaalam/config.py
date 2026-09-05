@@ -18,7 +18,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from dotenv import load_dotenv
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Importing this module is what loads `.env` for the whole application, so
@@ -54,6 +54,23 @@ DEV_CORS_ORIGINS = (
 
 def _truthy(value: str | None) -> bool:
     return (value or "").strip().lower() in _TRUTHY
+
+
+def clean_env_value(value: str | None) -> str:
+    """Strip whitespace and one layer of surrounding quotes.
+
+    `.env` files are parsed by python-dotenv (which strips quotes), but values
+    pasted into the Dokploy Environment UI are set as literal OS env vars --
+    `CLIENT_ID='abc'` there means the quotes are part of the value and WHOOP
+    rejects the client_id. Stripping here makes both styles work. A value of
+    `" "` (quoted blank) becomes empty, which correctly falls back to defaults.
+    """
+    if value is None:
+        return ""
+    s = value.strip()
+    if len(s) >= 2 and s[0] == s[-1] and s[0] in ("'", '"'):
+        s = s[1:-1].strip()
+    return s
 
 
 def resolve_app_env() -> str:
@@ -125,6 +142,15 @@ class Settings(BaseSettings):
     # from cron instead.
     nightly_job_enabled: bool = True
     nightly_job_hour: int = 4
+
+    @field_validator("*", mode="before")
+    @classmethod
+    def _clean_strings(cls, v: object) -> object:
+        # Pydantic parses non-str fields (bool/int) from strings itself; only
+        # clean actual strings so `false`/`720` keep working.
+        if isinstance(v, str):
+            return clean_env_value(v)
+        return v
 
     @property
     def trusted_hosts(self) -> list[str]:

@@ -15,6 +15,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from thaalam import db
 from thaalam.api.deps import acquire_writable_connection, build_whoop_client, is_whoop_connected
+from thaalam.config import clean_env_value, get_settings
 from thaalam.services.derived_metrics import recompute
 from thaalam.whoop_client.client import WhoopClient
 
@@ -153,7 +154,9 @@ def _fetch_resource(client: WhoopClient, kind: str, resource_id: Any) -> dict[st
 @router.post("/whoop")
 async def whoop_webhook(request: Request) -> dict[str, Any]:
     body = await request.body()
-    secret = os.getenv("CLIENT_SECRET") or os.getenv("WHOOP_CLIENT_SECRET") or ""
+    # Webhook secret is CLIENT_SECRET; read via settings so Dokploy-pasted
+    # quotes are stripped, with a raw-env fallback for the WHOOP_ alias.
+    secret = get_settings().client_secret or clean_env_value(os.getenv("WHOOP_CLIENT_SECRET"))
     check_webhook_signature(
         body,
         request.headers.get("x-whoop-signature-timestamp"),

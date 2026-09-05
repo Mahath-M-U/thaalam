@@ -29,6 +29,7 @@ from thaalam.api.deps import (
 )
 from thaalam.auth import store as auth_store
 from thaalam.auth.sessions import AuthenticatedUser
+from thaalam.config import get_settings
 from thaalam.logging_config import request_id_var
 from thaalam.services.derived_metrics import recompute
 from thaalam.sync import BACKFILL_DAYS, backfill_window
@@ -96,7 +97,7 @@ def oauth_callback(
     the request may not carry the app's cookie. The single-use `state` written
     by the admin-only /connect is what authorises it.
     """
-    frontend = os.getenv("FRONTEND_URL") or "http://localhost:5173"
+    frontend = get_settings().frontend_url or "http://localhost:5173"
     if error:
         return RedirectResponse(f"{frontend}/?whoop=error", status_code=302)
     if not code:

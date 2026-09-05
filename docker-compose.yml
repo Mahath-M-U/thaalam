@@ -30,6 +30,9 @@ services:
       CLIENT_ID: ${CLIENT_ID:-}
       CLIENT_SECRET: ${CLIENT_SECRET:-}
       REDIRECT_URI: ${REDIRECT_URI:-}
+      AUTHORIZATION_URL: ${AUTHORIZATION_URL:-}
+      TOKEN_URL: ${TOKEN_URL:-}
+      REVOKE_URL: ${REVOKE_URL:-}
       WHOOP_TOKEN_KEY: ${WHOOP_TOKEN_KEY:-}
       WHOOP_TOKEN_KEY_FILE: ${WHOOP_TOKEN_KEY_FILE:-}
       FRONTEND_URL: ${FRONTEND_URL:-}
@@ -44,6 +47,7 @@ services:
       # Only the reverse proxy can reach this port, so trusting its
       # X-Forwarded-For is what makes throttling see real client addresses.
       FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-*}
+      OPROUTER_API_KEY: ${OPROUTER_API_KEY:-}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     volumes:
       - thaalam_data:/app/data
