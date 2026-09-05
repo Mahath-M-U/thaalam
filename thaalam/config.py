@@ -202,9 +202,18 @@ class Settings(BaseSettings):
                 "sent over plain HTTP"
             )
         if not self.whoop_token_key.strip():
+            # Left unset, the app would mint a key into the container's own
+            # filesystem, which is not the mounted volume -- so the next
+            # redeploy would take the key with it and leave the stored WHOOP
+            # token permanently undecryptable.
             problems.append(
-                "WHOOP_TOKEN_KEY must be set -- refusing to mint a key file "
-                "alongside the encrypted token"
+                "WHOOP_TOKEN_KEY must be set. It encrypts the stored WHOOP\n"
+                "      token; generated inside the container it would be lost on\n"
+                "      the next redeploy, leaving the token unreadable.\n"
+                "      Generate one now, set it in your host's environment, and\n"
+                "      keep it -- changing it later means reconnecting WHOOP:\n"
+                "        python -c \"import os,base64; "
+                'print(base64.urlsafe_b64encode(os.urandom(32)).decode())"'
             )
         # An installed package puts the default data directory inside
         # site-packages, which no sane deployment mounts as a volume: the

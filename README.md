@@ -188,8 +188,36 @@ there — the single-use `state` from the admin-only connect step authorises it.
 cp .env.example .env      # then fill it in; APP_ENV=production
 ```
 
-Required in production, enforced at startup: `WHOOP_TOKEN_KEY`, no `*` in
-`ALLOWED_ORIGINS`, and `COOKIE_SECURE` not disabled.
+Required in production, enforced at startup: `WHOOP_TOKEN_KEY`, a `DATA_DIR`
+outside the installed package, no `*` in `ALLOWED_ORIGINS`, and `COOKIE_SECURE`
+not disabled. The app refuses to boot otherwise rather than failing later in a
+way that costs data.
+
+### Container hosts (Dokploy, Coolify, plain compose)
+
+Set these in the host's environment tab — not in the compose file, which is
+committed:
+
+| Variable | Value |
+|---|---|
+| `APP_ENV` | `production` |
+| `WHOOP_TOKEN_KEY` | 32 random bytes — generate once, then **keep it** |
+| `CLIENT_ID` / `CLIENT_SECRET` | from the WHOOP developer dashboard |
+| `REDIRECT_URI` | `https://your-domain/api/oauth/whoop/callback` |
+| `FRONTEND_URL` | `https://your-domain` |
+
+```bash
+python -c "import os,base64; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"
+```
+
+`WHOOP_TOKEN_KEY` encrypts the stored WHOOP token. Generated inside the
+container it would live outside the mounted volume and vanish on the next
+redeploy, leaving the token undecryptable — which is why startup insists on it.
+Changing it later means reconnecting WHOOP.
+
+`DATA_DIR` is already set to `/app/data` by the image, and `REDIRECT_URI` must
+match a URI registered in the WHOOP dashboard exactly. Once it boots, open
+`/register` to claim the owner account.
 
 **Run exactly one worker.** DuckDB allows one writer and the API holds a single
 process-wide writable connection; a second worker would fight it for the file,
