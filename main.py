@@ -1,25 +1,18 @@
-"""Start the Thaalam FastAPI server.
+"""Start the Thaalam API server.
 
-    uv run run_api.py
-    # or: uv run uvicorn thaalam.api.main:app --reload --port 8000
+Thin alias for `run_api.py`, kept because the README and launch config both
+point here.
+
+    uv run main.py
+
+The WHOOP sync itself lives in `thaalam/app.py` (interactive OAuth + full
+historical sync) and runs from the API via the nightly job, webhooks, and the
+Refresh button.
 """
 
 from __future__ import annotations
-from thaalam.app import main as run_whoop_sync
-import uvicorn
 
-def main() -> None:
-    uvicorn.run(
-        "thaalam.api.main:app",
-        host="127.0.0.1",
-        port=8000,
-        reload=True,
-    )
-
+from run_api import main
 
 if __name__ == "__main__":
     main()
-
-
-
-

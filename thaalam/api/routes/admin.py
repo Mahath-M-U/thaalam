@@ -15,6 +15,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, EmailStr, Field
 
+from thaalam.api.scheduler import scheduler_state
 from thaalam.api.deps import (
     DB_PATH,
     client_ip,
@@ -376,4 +377,9 @@ def system_health(con: sqlite3.Connection = Depends(get_auth_db)) -> dict[str, A
             "active_sessions": len(session_store.list_active_sessions(con)),
         },
         "last_recompute": _last_recompute(),
+        "nightly_job": {
+            "enabled": settings.nightly_job_enabled,
+            "hour": settings.nightly_job_hour,
+            **scheduler_state(),
+        },
     }

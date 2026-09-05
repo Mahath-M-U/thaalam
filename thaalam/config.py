@@ -111,6 +111,11 @@ class Settings(BaseSettings):
     max_request_bytes: int = 1_048_576
     allowed_hosts: str = ""
 
+    # Nightly recompute. Runs in-process; disable it if you drive the job
+    # from cron instead.
+    nightly_job_enabled: bool = True
+    nightly_job_hour: int = 4
+
     @property
     def trusted_hosts(self) -> list[str]:
         """Host allow-list, or empty to accept any Host header."""

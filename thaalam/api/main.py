@@ -12,7 +12,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import asyncio
 import logging
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,6 +29,7 @@ from thaalam.api.middleware import (
     RequestSizeLimitMiddleware,
     SecurityHeadersMiddleware,
 )
+from thaalam.api import scheduler
 from thaalam.api.routes import admin, auth, briefs, data, derived, health, oauth, webhooks
 from thaalam.config import get_settings
 from thaalam.logging_config import request_id_var, setup_logging
@@ -41,10 +44,26 @@ logger = logging.getLogger(__name__)
 # reconnaissance for an unauthenticated caller in production.
 _docs_enabled = not settings.is_production
 
+_background: set[asyncio.Task] = set()
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    task = scheduler.start(_background)
+    try:
+        yield
+    finally:
+        if task is not None:
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
+
+
 app = FastAPI(
     title="Thaalam API",
     description="WHOOP health data API (DuckDB-backed).",
     version="0.2.0",
+    lifespan=lifespan,
     docs_url="/docs" if _docs_enabled else None,
     redoc_url="/redoc" if _docs_enabled else None,
     openapi_url="/openapi.json" if _docs_enabled else None,

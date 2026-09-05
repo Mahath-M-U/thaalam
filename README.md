@@ -41,15 +41,33 @@ npm install
 cd ..
 ```
 
-## 1. Sync WHOOP data
+## 1. Create your account
 
-One-time interactive OAuth on first run; token cached under `data/`:
+The app requires a sign-in, and ships with **no default credentials**. Either
+start the server and open `/register` — the first visitor claims the owner
+account, and that window closes permanently once taken — or create it from the
+command line:
 
 ```bash
-uv run main.py
+uv run -m thaalam.auth.bootstrap --email you@example.com
 ```
 
-## 2. Start the API
+Everyone else joins by invitation: **Administration → Invitations** issues a
+single-use link that expires in a week.
+
+> A `viewer` sees the owner's health data — this is a sharing model, not
+> isolation. Invite accordingly.
+
+## 2. Sync WHOOP data
+
+Connect WHOOP from the dashboard (admin only), or run the interactive OAuth
+flow once; the token is cached encrypted under `data/`:
+
+```bash
+uv run python -m thaalam.app
+```
+
+## 3. Start the API
 
 ```bash
 uv run run_api.py
@@ -57,7 +75,7 @@ uv run run_api.py
 ```
 
 - API: http://127.0.0.1:8000  
-- OpenAPI docs: http://127.0.0.1:8000/docs  
+- OpenAPI docs: http://127.0.0.1:8000/docs (disabled when `APP_ENV=production`)  
 
 ### Main endpoints
 
@@ -75,7 +93,7 @@ uv run run_api.py
 | GET | `/api/workouts/by-sport` | Avg strain by sport |
 | GET | `/api/insights` | Derived insights (HRV baseline, ACWR, sleep debt, lag effects, …) |
 
-## 3. Start the React dashboard
+## 4. Start the React dashboard
 
 ```bash
 cd frontend
@@ -129,7 +147,70 @@ The **Insights** tab (`GET /api/insights`) computes extra analytics from the sam
 
 These are **local, descriptive** analytics — not medical advice or injury prediction.
 
+## Security model
+
+**Accounts.** Two roles. `admin` can sync, connect WHOOP, and manage accounts;
+`viewer` reads the dashboard and nothing else. Registration is possible only on
+first run or with an invite — there is no open signup, because an account here
+reads the owner's health data.
+
+**Sessions** are an opaque 256-bit token in an `HttpOnly`, `SameSite=Lax`
+cookie (`Secure` in production), stored only as a SHA-256. State-changing
+requests carry a per-session CSRF token as a header. Changing a password, or an
+admin resetting one, revokes that account's other sessions; disabling an
+account cuts its sessions off on their next request.
+
+**Login** returns one identical error for an unknown account, a wrong password
+and a disabled account, and spends the same CPU either way, so the form cannot
+be used to discover who has an account. Failures are throttled per account and
+per address, and the counters live in the database so a restart cannot clear a
+lockout.
+
+**Secrets.** WHOOP tokens are encrypted at rest; outside development
+`WHOOP_TOKEN_KEY` is required and the app refuses to start without it, along
+with insecure cookies or a wildcard CORS origin. Logs are JSON with secrets
+redacted — tokens, passwords, cookies and the configured secret values — and
+carry a request id that ties an error the user sees to the entry that explains
+it.
+
+**Auth data lives in its own SQLite database** (`data/thaalam_auth.db`), not
+the DuckDB file. DuckDB allows a single writer, so sharing it would let a
+90-day backfill block logins.
+
+Two endpoints are reachable without a session, each deliberately: `/health`,
+for container health checks, and the WHOOP webhook, which authenticates by HMAC
+signature. The OAuth callback is also open, since WHOOP redirects a browser
+there — the single-use `state` from the admin-only connect step authorises it.
+
+## Production deployment
+
+```bash
+cp .env.example .env      # then fill it in; APP_ENV=production
+```
+
+Required in production, enforced at startup: `WHOOP_TOKEN_KEY`, no `*` in
+`ALLOWED_ORIGINS`, and `COOKIE_SECURE` not disabled.
+
+**Run exactly one worker.** DuckDB allows one writer and the API holds a single
+process-wide writable connection; a second worker would fight it for the file,
+and the in-process rate limiter counts per process. Scaling out means moving off
+DuckDB first.
+
+**Terminate TLS at a reverse proxy** and let it forward. `Secure` cookies and
+HSTS assume HTTPS, and `run_api.py` enables `--proxy-headers` in production so
+the real client address reaches the throttler and the access log instead of the
+proxy's.
+
+**Back up `data/`** — it holds `whoop.duckdb` (health history), the encrypted
+WHOOP token, and `thaalam_auth.db` (accounts and audit trail). Back the auth
+database up separately if you want to rotate it independently. Logs rotate at
+5 MB × 3 files.
+
+The nightly recompute runs in-process at `NIGHTLY_JOB_HOUR` (04:00 by default).
+Set `NIGHTLY_JOB_ENABLED=false` and drive `python -m thaalam.services.nightly_job`
+from cron instead if you prefer.
+
 ## Notes
 
 - DuckDB allows one writer at a time. The API opens **read-only** connections so you can view the dashboard while a sync is not holding a write lock.
-- Data never leaves your machine except when talking to WHOOP during sync.
+- Data leaves your machine only when talking to WHOOP, and to whoever you invite.

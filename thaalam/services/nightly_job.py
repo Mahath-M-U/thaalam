@@ -23,8 +23,14 @@ def run_nightly_job(
     client: Any | None = None,
     *,
     reconcile_days: int = RECONCILE_DAYS,
+    con: Any | None = None,
 ) -> dict[str, Any]:
-    """Reconcile recent WHOOP rows, then recompute derived baselines."""
+    """Reconcile recent WHOOP rows, then recompute derived baselines.
+
+    Pass `con` when running inside the API process: DuckDB allows a single
+    writer, so a second connect() to the same file would fail against the
+    process-wide connection the API already holds.
+    """
     close_client = False
     if client is None:
         from thaalam.api.deps import build_whoop_client, is_whoop_connected
@@ -40,12 +46,15 @@ def run_nightly_job(
             logger.warning("WHOOP client has no token; skipping nightly job")
             return {"skipped": True, "reason": "not_connected"}
 
-        recon = reconcile_recent(client, db_path, days=reconcile_days)
-        con = db.get_connection(db_path) if db_path is not None else db.get_connection()
-        try:
+        recon = reconcile_recent(client, db_path, days=reconcile_days, con=con)
+        if con is not None:
             baselines = recompute(con, trigger="nightly")
-        finally:
-            con.close()
+        else:
+            own = db.get_connection(db_path) if db_path is not None else db.get_connection()
+            try:
+                baselines = recompute(own, trigger="nightly")
+            finally:
+                own.close()
         return {"skipped": False, "reconciliation": recon, "baselines": baselines}
     finally:
         if close_client and hasattr(client, "close"):
