@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "./auth/AuthContext";
 import { AdminView } from "./components/admin/AdminView";
+import { useAppRoute } from "./routes";
 import { HrvRhrChart } from "./components/charts/HrvRhrChart";
 import { RecoveryChart } from "./components/charts/RecoveryChart";
 import { SleepStagesChart } from "./components/charts/SleepStagesChart";
@@ -68,20 +69,29 @@ export default function App() {
   const { data, loading, error, reload } = useDashboardData();
   const { user, isAdmin, signOut } = useAuth();
   const isMobile = useIsMobile();
-  const [section, setSection] = useState<SectionId | "reads">("overview");
-  const [mobileTab, setMobileTab] = useState<MobileTab>("today");
+  // Which screen is showing comes from the URL, so every view is
+  // linkable, bookmarkable, and answers to the back button.
+  const {
+    section,
+    mobileTab,
+    openRead,
+    runwayOpen,
+    showAdmin,
+    adminTab,
+    setSection,
+    setMobileTab,
+    setOpenRead,
+    setRunwayOpen,
+    setShowAdmin,
+    setAdminTab,
+  } = useAppRoute();
   const [rangeDays, setRangeDays] = useState<RangeDays>(DEFAULT_RANGE_DAYS);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [readsPayload, setReadsPayload] = useState<DerivedReadsResponse | null>(null);
-  const [openRead, setOpenRead] = useState<string | null>(null);
-  // A view swap in the existing nav state, not a route: nothing else here
-  // uses URLs, and a router would be a new dependency for one screen.
-  const [showAdmin, setShowAdmin] = useState(false);
   const [divePayload, setDivePayload] = useState<DerivedReadDiveResponse | null>(null);
   const [diveStatus, setDiveStatus] = useState<"idle" | "loading" | "error">("idle");
   const [runway, setRunway] = useState<RunwayResponse | null>(null);
-  const [runwayOpen, setRunwayOpen] = useState(false);
   const [mobileModalOpen, setMobileModalOpen] = useState(false);
 
   const loadRunway = useCallback(async () => {
@@ -317,7 +327,7 @@ export default function App() {
               <button
                 type="button"
                 className="btn ghost"
-                onClick={() => setShowAdmin((open) => !open)}
+                onClick={() => setShowAdmin(!showAdmin)}
               >
                 {showAdmin ? "Dashboard" : "Administration"}
               </button>
@@ -331,7 +341,11 @@ export default function App() {
 
       {showAdmin ? (
         <main className="main">
-          <AdminView onClose={() => setShowAdmin(false)} />
+          <AdminView
+            tab={adminTab}
+            onTab={setAdminTab}
+            onClose={() => setShowAdmin(false)}
+          />
         </main>
       ) : (
       <main className="main">

@@ -6,20 +6,23 @@ import {
   type AdminSystem,
   type AdminUser,
 } from "../../api";
+import type { AdminTab } from "../../routes";
 import { Section } from "../Section";
 
-type Tab = "users" | "sessions" | "audit" | "system";
-
-const TABS: { id: Tab; label: string }[] = [
+const TABS: { id: AdminTab; label: string }[] = [
   { id: "users", label: "Accounts" },
   { id: "sessions", label: "Sessions" },
   { id: "audit", label: "Audit" },
   { id: "system", label: "System" },
 ];
 
-export function AdminView({ onClose }: { onClose: () => void }) {
-  const [tab, setTab] = useState<Tab>("users");
+interface Props {
+  tab: AdminTab;
+  onTab: (tab: AdminTab) => void;
+  onClose: () => void;
+}
 
+export function AdminView({ tab, onTab, onClose }: Props) {
   return (
     <div className="admin-view">
       <header className="admin-head">
@@ -38,7 +41,7 @@ export function AdminView({ onClose }: { onClose: () => void }) {
             key={item.id}
             type="button"
             className={tab === item.id ? "active" : ""}
-            onClick={() => setTab(item.id)}
+            onClick={() => onTab(item.id)}
           >
             {item.label}
           </button>

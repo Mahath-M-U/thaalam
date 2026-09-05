@@ -15,7 +15,7 @@ interface AuthValue {
   status: AuthStatus;
   user: CurrentUser | null;
   isAdmin: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<CurrentUser>;
   signOut: () => Promise<void>;
   changePassword: (current: string, next: string) => Promise<void>;
 }
@@ -62,6 +62,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const current = await api.login(email, password);
     setUser(current);
     setStatus("signed-in");
+    // Returned so the caller can route on must_change_password without
+    // waiting for the state update to land.
+    return current;
   }, []);
 
   const signOut = useCallback(async () => {
