@@ -27,7 +27,7 @@ from thaalam.api.middleware import (
     RequestSizeLimitMiddleware,
     SecurityHeadersMiddleware,
 )
-from thaalam.api.routes import auth, briefs, data, derived, health, oauth, webhooks
+from thaalam.api.routes import admin, auth, briefs, data, derived, health, oauth, webhooks
 from thaalam.config import get_settings
 from thaalam.logging_config import request_id_var, setup_logging
 
@@ -91,6 +91,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 
 app.include_router(health.router)
 app.include_router(auth.router)
+app.include_router(admin.router)
 app.include_router(data.router)
 app.include_router(briefs.router)
 app.include_router(oauth.router)

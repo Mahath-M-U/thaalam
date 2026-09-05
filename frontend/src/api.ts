@@ -92,6 +92,58 @@ export interface CurrentUser {
   csrf_token: string;
 }
 
+export interface AdminUser {
+  id: number;
+  email: string;
+  role: "admin" | "viewer";
+  is_active: boolean;
+  must_change_password: boolean;
+  created_at: string;
+  last_login_at: string | null;
+}
+
+export interface CreatedUser {
+  user: AdminUser;
+  temporary_password: string;
+}
+
+export interface AdminSession {
+  id: number;
+  email: string;
+  role: string;
+  created_at: string;
+  last_seen_at: string;
+  expires_at: string;
+  client_ip: string | null;
+  user_agent: string | null;
+}
+
+export interface AdminAuditEntry {
+  id: number;
+  created_at: string;
+  event: string;
+  actor_email: string | null;
+  client_ip: string | null;
+  request_id: string | null;
+  detail: string | null;
+}
+
+export interface AdminAuditPage {
+  total: number;
+  entries: AdminAuditEntry[];
+}
+
+export interface AdminSystem {
+  environment: string;
+  whoop_connected: boolean;
+  secure_cookies: boolean;
+  session_ttl_minutes: number;
+  database: { path: string; exists: boolean; size_bytes: number | null };
+  auth_database: { path: string; size_bytes: number | null };
+  accounts: { total: number; active_admins: number; active_sessions: number };
+  last_recompute: { trigger: string; at: string } | null;
+}
+
 export const api = {
   health: () => requestJson<{ status: string; database_exists: boolean }>("/health"),
   summary: () => requestJson<SummaryResponse>("/api/summary"),
@@ -115,6 +167,30 @@ export const api = {
   derivedReadDive: (id: string) =>
     requestJson<DerivedReadDiveResponse>(`/api/derived/reads/${encodeURIComponent(id)}`),
   derivedRunway: () => requestJson<RunwayResponse>("/api/derived/runway"),
+
+  adminUsers: () => requestJson<AdminUser[]>("/api/admin/users"),
+  adminCreateUser: (email: string, role: AdminUser["role"]) =>
+    requestJson<CreatedUser>("/api/admin/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, role }),
+    }),
+  adminUpdateUser: (id: number, patch: { role?: string; is_active?: boolean }) =>
+    requestJson<AdminUser>(`/api/admin/users/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    }),
+  adminResetPassword: (id: number) =>
+    requestJson<CreatedUser>(`/api/admin/users/${id}/reset-password`, { method: "POST" }),
+  adminSessions: () => requestJson<AdminSession[]>("/api/admin/sessions"),
+  adminRevokeSession: (id: number) =>
+    requestJson<void>(`/api/admin/sessions/${id}`, { method: "DELETE" }),
+  adminAudit: (limit = 50, event?: string) =>
+    requestJson<AdminAuditPage>(
+      `/api/admin/audit?limit=${limit}${event ? `&event=${encodeURIComponent(event)}` : ""}`,
+    ),
+  adminSystem: () => requestJson<AdminSystem>("/api/admin/system"),
 
   me: () => requestJson<CurrentUser>("/api/auth/me"),
   login: (email: string, password: string) =>

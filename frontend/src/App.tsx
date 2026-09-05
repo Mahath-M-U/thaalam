@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "./auth/AuthContext";
+import { AdminView } from "./components/admin/AdminView";
 import { HrvRhrChart } from "./components/charts/HrvRhrChart";
 import { RecoveryChart } from "./components/charts/RecoveryChart";
 import { SleepStagesChart } from "./components/charts/SleepStagesChart";
@@ -74,6 +75,9 @@ export default function App() {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [readsPayload, setReadsPayload] = useState<DerivedReadsResponse | null>(null);
   const [openRead, setOpenRead] = useState<string | null>(null);
+  // A view swap in the existing nav state, not a route: nothing else here
+  // uses URLs, and a router would be a new dependency for one screen.
+  const [showAdmin, setShowAdmin] = useState(false);
   const [divePayload, setDivePayload] = useState<DerivedReadDiveResponse | null>(null);
   const [diveStatus, setDiveStatus] = useState<"idle" | "loading" | "error">("idle");
   const [runway, setRunway] = useState<RunwayResponse | null>(null);
@@ -309,6 +313,15 @@ export default function App() {
               {user?.email}
             </span>
             <span className="account-role">{user?.role}</span>
+            {isAdmin ? (
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => setShowAdmin((open) => !open)}
+              >
+                {showAdmin ? "Dashboard" : "Administration"}
+              </button>
+            ) : null}
             <button type="button" className="btn ghost" onClick={() => void signOut()}>
               Sign out
             </button>
@@ -316,6 +329,11 @@ export default function App() {
         </div>
       </aside>
 
+      {showAdmin ? (
+        <main className="main">
+          <AdminView onClose={() => setShowAdmin(false)} />
+        </main>
+      ) : (
       <main className="main">
         <header className="topbar">
           <div>
@@ -466,6 +484,7 @@ export default function App() {
         <RunwayDive runway={runway} onClose={() => setRunwayOpen(false)} />
       )}
       </main>
+      )}
     </div>
   );
 }
