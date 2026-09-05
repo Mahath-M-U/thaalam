@@ -1,0 +1,29 @@
+# Keep the image small and secret-free. Dokploy injects env at runtime.
+.git/
+.gitignore
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.py[oc]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.vscode/
+.claude/
+
+# Local data must NOT be baked into the image (persisted via volume instead).
+data/
+docs/
+
+# Frontend build inputs that bloat context; dist is rebuilt inside Docker.
+frontend/node_modules/
+frontend/dist/
+node_modules/
+dist/
+
+# Dev/test artefacts
+tests/
+*/tests_*
+*.log

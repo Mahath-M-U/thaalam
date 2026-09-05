@@ -1,0 +1,47 @@
+# Thaalam — Dokploy-ready compose.
+# Deploy as a "Docker Compose" app in Dokploy, then attach your purchased
+# domain in the Dokploy UI (Domains -> Add, HTTPS auto via Let's Encrypt).
+#
+# Persistent data (DuckDB, WHOOP token, auth sqlite) lives in the
+# `thaalam_data` volume mounted at /app/data, so redeploys keep your data.
+#
+# All secrets are set in the Dokploy UI (Environment tab), NOT in this file.
+# See .env.example for the full list. Minimum production set:
+#   APP_ENV=production
+#   CLIENT_ID / CLIENT_SECRET / REDIRECT_URI (WHOOP dashboard)
+#   WHOOP_TOKEN_KEY (32 bytes, base64 — generate once, keep it)
+#   FRONTEND_URL=https://your-domain.com
+#   REDIRECT_URI=https://your-domain.com/api/oauth/whoop/callback
+#   (REDIRECT_URI must exactly match a URI registered in WHOOP dashboard)
+
+services:
+  thaalam:
+    build: .
+    image: thaalam:latest
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      PORT: "8000"
+      # Passed through from Dokploy environment if set; blank is fine locally.
+      CLIENT_ID: ${CLIENT_ID:-}
+      CLIENT_SECRET: ${CLIENT_SECRET:-}
+      REDIRECT_URI: ${REDIRECT_URI:-}
+      WHOOP_TOKEN_KEY: ${WHOOP_TOKEN_KEY:-}
+      WHOOP_TOKEN_KEY_FILE: ${WHOOP_TOKEN_KEY_FILE:-}
+      FRONTEND_URL: ${FRONTEND_URL:-}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      COOKIE_SECURE: ${COOKIE_SECURE:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - thaalam_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  thaalam_data:
