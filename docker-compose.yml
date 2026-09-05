@@ -22,7 +22,14 @@ services:
     ports:
       - "8001:8001"
     environment:
-      APP_ENV: ${APP_ENV:-production}
+      # Pinned, not ${APP_ENV:-production}: a stray APP_ENV=development in the
+      # host's environment makes run_api.py bind 127.0.0.1, and the healthcheck
+      # curls localhost from inside the container -- so the container reports
+      # healthy while the reverse proxy gets connection refused and serves 502.
+      APP_ENV: production
+      # Belt and braces for the same failure: a container has no reason to
+      # listen on loopback, and only the proxy can reach this port anyway.
+      HOST: ${HOST:-0.0.0.0}
       PORT: "8001"
       # Must point at the mounted volume; see the Dockerfile for why.
       DATA_DIR: /app/data
