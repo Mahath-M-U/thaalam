@@ -2,16 +2,22 @@
 
 from __future__ import annotations
 
+import secrets
+import sqlite3
 from collections.abc import Generator
 from pathlib import Path
 from threading import Lock
 
 import duckdb
-from fastapi import HTTPException
+from fastapi import Depends, HTTPException, Request
 
+from thaalam.auth import sessions as session_store
+from thaalam.auth import store as auth_store
+from thaalam.auth.sessions import AuthenticatedUser
 from thaalam.config import get_settings
 from thaalam.db import DEFAULT_DB_PATH
 from thaalam.db import get_connection as _open_base_connection
+from thaalam.logging_config import current_user_var
 from thaalam.whoop_client.auth import AUTHORIZE_URL, REVOKE_URL, TOKEN_URL, default_token_key_path
 from thaalam.whoop_client.client import WhoopClient
 
@@ -138,3 +144,82 @@ def is_whoop_connected() -> bool:
         return bool(token.get("refresh_token") or token.get("access_token"))
     finally:
         client.close()
+
+
+# ---------------------------------------------------------------------------
+# Authentication
+# ---------------------------------------------------------------------------
+
+
+def get_auth_db() -> Generator[sqlite3.Connection, None, None]:
+    """Yield a connection to the auth database (separate from the DuckDB)."""
+    with auth_store.connect() as con:
+        yield con
+
+
+def client_ip(request: Request) -> str | None:
+    return request.client.host if request.client else None
+
+
+def _unauthenticated() -> HTTPException:
+    return HTTPException(
+        status_code=401,
+        detail="Authentication required",
+        headers={"WWW-Authenticate": "Cookie"},
+    )
+
+
+def get_current_user(
+    request: Request,
+    con: sqlite3.Connection = Depends(get_auth_db),
+) -> AuthenticatedUser:
+    """Resolve the session cookie, enforcing CSRF on state-changing requests.
+
+    CSRF is checked here rather than in a separate dependency so that every
+    authenticated write is covered by construction -- a route cannot forget it
+    while still requiring a user. Requests without a session never reach this,
+    which is what keeps the signature-verified WHOOP webhook exempt.
+    """
+    token = request.cookies.get(session_store.SESSION_COOKIE, "")
+    if not token:
+        raise _unauthenticated()
+
+    user = session_store.lookup_session(
+        con, token, ttl_minutes=get_settings().session_ttl_minutes
+    )
+    if user is None:
+        raise _unauthenticated()
+
+    if request.method not in session_store.SAFE_METHODS:
+        supplied = request.headers.get(session_store.CSRF_HEADER, "")
+        if not supplied or not secrets.compare_digest(supplied, user.csrf_token):
+            raise HTTPException(status_code=403, detail="Invalid or missing CSRF token")
+
+    # Surfaces the account in the access log for this request.
+    current_user_var.set(user.email)
+    return user
+
+
+def require_user(
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> AuthenticatedUser:
+    """An authenticated user who is not mid-forced-password-change.
+
+    A user who must rotate their password can still reach the auth routes, but
+    nothing else, so a bootstrap credential can't be left in place while the
+    account is used normally.
+    """
+    if user.must_change_password:
+        raise HTTPException(
+            status_code=403,
+            detail="Password change required before continuing",
+        )
+    return user
+
+
+def require_admin(
+    user: AuthenticatedUser = Depends(require_user),
+) -> AuthenticatedUser:
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Administrator access required")
+    return user

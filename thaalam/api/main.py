@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from thaalam.api.middleware import RequestContextMiddleware
-from thaalam.api.routes import briefs, data, derived, health, oauth, webhooks
+from thaalam.api.routes import auth, briefs, data, derived, health, oauth, webhooks
 from thaalam.config import get_settings
 from thaalam.logging_config import setup_logging
 
@@ -47,6 +47,7 @@ app.add_middleware(
 app.add_middleware(RequestContextMiddleware)
 
 app.include_router(health.router)
+app.include_router(auth.router)
 app.include_router(data.router)
 app.include_router(briefs.router)
 app.include_router(oauth.router)
