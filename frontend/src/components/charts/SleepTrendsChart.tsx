@@ -65,7 +65,7 @@ export function SleepTrendsChart({ records }: Props) {
             type="monotone"
             dataKey="performance"
             name="Performance"
-            stroke={CHART_COLORS.ink}
+            stroke={CHART_COLORS.amber}
             strokeWidth={2}
             dot={false}
             connectNulls

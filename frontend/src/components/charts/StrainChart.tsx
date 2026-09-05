@@ -10,7 +10,7 @@ import {
 import type { CycleRecord } from "../../types";
 import { shortDate } from "../../utils";
 import { ChartCard } from "../ChartCard";
-import { WASH_LAVENDER, axisLine, axisTick, CHART_COLORS, gridStroke, tooltipStyle } from "../../chartTheme";
+import { AMBER_14, axisLine, axisTick, CHART_COLORS, gridStroke, tooltipStyle } from "../../chartTheme";
 
 interface Props {
   records: CycleRecord[];
@@ -60,9 +60,9 @@ export function StrainChart({ records }: Props) {
             type="monotone"
             dataKey="strain"
             name="Strain"
-            stroke={CHART_COLORS.ink}
+            stroke={CHART_COLORS.amber}
             strokeWidth={2}
-            fill={WASH_LAVENDER}
+            fill={AMBER_14}
             dot={false}
           />
         </AreaChart>

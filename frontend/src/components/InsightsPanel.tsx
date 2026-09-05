@@ -20,8 +20,7 @@ import { ChartCard } from "./ChartCard";
 import { DailyBriefCard } from "./DailyBriefCard";
 import { Section } from "./Section";
 import {
-  INK,
-  WASH_PEACH,
+  AMBER,
   CHART_COLORS,
   axisLine,
   axisTick,
@@ -176,7 +175,7 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays, onOpenRead }: P
                 stackId="norm"
                 name="±10% of baseline"
                 stroke="none"
-                fill={INK}
+                fill={AMBER}
                 fillOpacity={0.08}
                 legendType="none"
                 tooltipType="none"
@@ -193,7 +192,7 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays, onOpenRead }: P
                 type="monotone"
                 dataKey="baseline"
                 name="30d baseline"
-                stroke={CHART_COLORS.ink}
+                stroke={CHART_COLORS.amber}
                 strokeWidth={2}
                 strokeDasharray="5 5"
                 dot={false}
@@ -228,7 +227,7 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays, onOpenRead }: P
                 domain={["auto", "auto"]}
               />
               <Tooltip contentStyle={tooltipStyle} />
-              <ReferenceArea y1={1.3} y2={1.5} fill={WASH_PEACH} fillOpacity={0.55} />
+              <ReferenceArea y1={1.3} y2={1.5} fill={CHART_COLORS.amber} fillOpacity={0.07} />
               <ReferenceLine y={0.8} stroke={guideStroke} strokeDasharray="3 3" />
               <ReferenceLine y={1.3} stroke={guideStroke} strokeDasharray="3 3" />
               <ReferenceLine y={1.5} stroke={guideStroke} strokeDasharray="3 3" />
@@ -236,7 +235,7 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays, onOpenRead }: P
                 type="monotone"
                 dataKey="acwr"
                 name="ACWR"
-                stroke={CHART_COLORS.ink}
+                stroke={CHART_COLORS.amber}
                 strokeWidth={2}
                 dot={false}
               />
@@ -283,7 +282,7 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays, onOpenRead }: P
       {zonePct && (
         <ChartCard
           title="Recovery zone mix"
-          description="All history · share of days by recovery score as an ink opacity ladder."
+          description="All history · share of days by recovery score as an amber opacity ladder."
         >
           <ResponsiveContainer width="100%" height={260}>
             <BarChart
@@ -334,7 +333,7 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays, onOpenRead }: P
               <em>{zonePct.green}%</em>
             </li>
           </ul>
-          <p className="chart-footnote">All history · share of your recovery scores as an ink opacity ladder.</p>
+          <p className="chart-footnote">All history · share of your recovery scores as an amber opacity ladder.</p>
         </ChartCard>
       )}
 

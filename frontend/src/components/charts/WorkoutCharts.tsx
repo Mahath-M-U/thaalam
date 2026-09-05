@@ -63,7 +63,7 @@ export function StrainBySportChart({ sports, efficiencyDeltas, onOpenRead }: Spo
             tickLine={false}
           />
           <Tooltip contentStyle={tooltipStyle} />
-          <Bar dataKey="avg_strain" name="Avg strain" fill={CHART_COLORS.ink} radius={[0, 4, 4, 0]} />
+          <Bar dataKey="avg_strain" name="Avg strain" fill={CHART_COLORS.amber} radius={[0, 4, 4, 0]} />
         </BarChart>
       </ResponsiveContainer>
       {efficiencyDeltas && efficiencyDeltas.some((d) => d.enabled && d.delta_bpm != null) ? (
@@ -155,7 +155,7 @@ export function WorkoutFrequencyChart({ workouts }: FreqProps) {
             width={28}
           />
           <Tooltip contentStyle={tooltipStyle} />
-          <Bar dataKey="count" name="Workouts" fill={CHART_COLORS.ink} radius={[4, 4, 0, 0]} />
+          <Bar dataKey="count" name="Workouts" fill={CHART_COLORS.amber} radius={[4, 4, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
       <p className="chart-footnote">Weekly counts from your logged workouts in the selected range.</p>

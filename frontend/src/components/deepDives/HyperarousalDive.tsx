@@ -14,7 +14,7 @@ import {
 import type { DerivedRead, HyperarousalPoint } from "../../types";
 import { ChartCard } from "../ChartCard";
 import { CalibratingNote, DeepDive } from "../DeepDive";
-import { INK, MUTED_SOFT, axisLine, axisTick, CHART_COLORS, gridStroke, tooltipStyle } from "../../chartTheme";
+import { AMBER, axisLine, axisTick, CHART_COLORS, gridStroke, tooltipStyle } from "../../chartTheme";
 
 interface Dive {
   scatter?: HyperarousalPoint[];
@@ -59,7 +59,7 @@ export function HyperarousalDive({ read, dive, onBack }: Props) {
         ) : (
           <ChartCard
             title="Debt × latency"
-            description="Pale nights are your own history. Ink sits in the can't-get-to-sleep quadrant — high debt and long awake time versus your upper quartile."
+            description="Grey nights are your own history. Amber sits in the can't-get-to-sleep quadrant — high debt and long awake time versus your upper quartile."
           >
             <ResponsiveContainer width="100%" height={280}>
               <ScatterChart margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
@@ -91,11 +91,11 @@ export function HyperarousalDive({ read, dive, onBack }: Props) {
                   x2={xMax * 1.05}
                   y1={yCut}
                   y2={yMax * 1.05}
-                  fill={INK}
+                  fill={AMBER}
                   fillOpacity={0.08}
                 />
-                <Scatter name="Other nights" data={rest} fill={MUTED_SOFT} />
-                <Scatter name="Can't-get-to-sleep" data={flagged} fill={INK} />
+                <Scatter name="Other nights" data={rest} fill="#8A8A8A" />
+                <Scatter name="Can't-get-to-sleep" data={flagged} fill={AMBER} />
               </ScatterChart>
             </ResponsiveContainer>
           </ChartCard>
@@ -119,7 +119,7 @@ export function HyperarousalDive({ read, dive, onBack }: Props) {
               <Tooltip contentStyle={tooltipStyle} />
               <Bar dataKey="pct" name="% of nights" radius={[0, 4, 4, 0]}>
                 {(dive.drivers ?? []).map((d) => (
-                  <Cell key={d.name} fill={d.name.startsWith("Both") ? INK : CHART_COLORS.recoveryMid} />
+                  <Cell key={d.name} fill={d.name.startsWith("Both") ? AMBER : CHART_COLORS.recoveryMid} />
                 ))}
               </Bar>
             </BarChart>

@@ -11,7 +11,7 @@ import {
 import type { RecoveryRecord } from "../../types";
 import { shortDate } from "../../utils";
 import { ChartCard } from "../ChartCard";
-import { INK, WASH_MINT, axisLine, axisTick, CHART_COLORS, gridStroke, tooltipStyle } from "../../chartTheme";
+import { AMBER, axisLine, axisTick, CHART_COLORS, gridStroke, tooltipStyle } from "../../chartTheme";
 
 interface Props {
   records: RecoveryRecord[];
@@ -37,12 +37,12 @@ export function RecoveryChart({ records }: Props) {
   return (
     <ChartCard
       title="Recovery score over time"
-      description="Daily recovery (0–100) with a full-plot mint wash until personal bands exist."
+      description="Daily recovery (0–100) with a full-plot amber 8% wash until personal bands exist."
       wide
     >
       <ResponsiveContainer width="100%" height={280}>
         <LineChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-          <ReferenceArea y1={0} y2={100} fill={WASH_MINT} fillOpacity={0.5} />
+          <ReferenceArea y1={0} y2={100} fill={AMBER} fillOpacity={0.08} />
           <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
           <XAxis
             dataKey="label"
@@ -81,13 +81,13 @@ export function RecoveryChart({ records }: Props) {
                   cx={cx}
                   cy={cy}
                   r={3.5}
-                  fill={INK}
-                  stroke="#ffffff"
+                  fill={AMBER}
+                  stroke="#1A1A1A"
                   strokeWidth={1}
                 />
               );
             }}
-            activeDot={{ r: 5, fill: INK }}
+            activeDot={{ r: 5, fill: AMBER }}
           />
         </LineChart>
       </ResponsiveContainer>

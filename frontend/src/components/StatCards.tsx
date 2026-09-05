@@ -13,7 +13,7 @@ export function StatCards({ stats, latest }: Props) {
     <div className="stat-grid">
       <div className="stat-card">
         <div className="stat-label">Latest recovery</div>
-        <div className="stat-value">
+        <div className="stat-value" style={{ color: "var(--amber)" }}>
           {formatNumber(recovery, 0)}
         </div>
         <div className="stat-sub">Autonomic readiness</div>

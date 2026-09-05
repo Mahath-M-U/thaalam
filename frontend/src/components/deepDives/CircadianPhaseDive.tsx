@@ -2,7 +2,7 @@ import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis
 import type { DerivedRead, PhaseCalendarCell, PhasePenaltyBar } from "../../types";
 import { ChartCard } from "../ChartCard";
 import { CalibratingNote, DeepDive } from "../DeepDive";
-import { INK, INK_35, axisLine, axisTick, gridStroke, tooltipStyle } from "../../chartTheme";
+import { AMBER, axisLine, axisTick, gridStroke, tooltipStyle } from "../../chartTheme";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -42,7 +42,7 @@ export function CircadianPhaseDive({ read, dive, onBack }: Props) {
         ) : (
           <ChartCard
             title="5 × 7 midpoint shift"
-            description="The ink deepens as last night's midpoint sits farther from your own 21-night mean."
+            description="Amber deepens as last night's midpoint sits farther from your own 21-night mean."
           >
             <HeatCalendar cells={cells} />
           </ChartCard>
@@ -62,7 +62,7 @@ export function CircadianPhaseDive({ read, dive, onBack }: Props) {
               <Tooltip contentStyle={tooltipStyle} />
               <Bar dataKey="penalty_ms" name="HRV vs mean" radius={[4, 4, 0, 0]}>
                 {bars.map((b) => (
-                  <Cell key={b.bucket} fill={(b.penalty_ms ?? 0) >= 0 ? INK : INK_35} />
+                  <Cell key={b.bucket} fill={(b.penalty_ms ?? 0) >= 0 ? AMBER : "rgba(255,196,0,0.35)"} />
                 ))}
               </Bar>
             </BarChart>
@@ -113,7 +113,7 @@ export function CircadianPhasePreview({
             <Tooltip contentStyle={tooltipStyle} />
             <Bar dataKey="penalty_ms" radius={[3, 3, 0, 0]}>
               {bars.map((b) => (
-                <Cell key={b.bucket} fill={(b.penalty_ms ?? 0) >= 0 ? INK : INK_35} />
+                <Cell key={b.bucket} fill={(b.penalty_ms ?? 0) >= 0 ? AMBER : "rgba(255,196,0,0.35)"} />
               ))}
             </Bar>
           </BarChart>
@@ -176,7 +176,7 @@ function HeatCalendar({ cells }: { cells: PhaseCalendarCell[] }) {
                     ? `${cell.date}: ${shift != null ? `${shift >= 0 ? "+" : ""}${shift.toFixed(0)} min` : "—"}`
                     : undefined
                 }
-                style={{ background: cell ? `rgba(12,10,9,${0.1 + opacity * 0.7})` : "#f0efed" }}
+                style={{ background: cell ? `rgba(255,196,0,${0.15 + opacity * 0.75})` : "#131313" }}
               />
             );
           })}
@@ -185,10 +185,10 @@ function HeatCalendar({ cells }: { cells: PhaseCalendarCell[] }) {
       <div className="heat-legend">
         <span>on mean</span>
         <span className="heat-ramp">
-          <i style={{ background: "rgba(12,10,9,0.1)" }} />
-          <i style={{ background: "rgba(12,10,9,0.36)" }} />
-          <i style={{ background: "rgba(12,10,9,0.62)" }} />
-          <i style={{ background: INK }} />
+          <i style={{ background: "rgba(255,196,0,0.15)" }} />
+          <i style={{ background: "rgba(255,196,0,0.4)" }} />
+          <i style={{ background: "rgba(255,196,0,0.7)" }} />
+          <i style={{ background: "#FFC400" }} />
         </span>
         <span>far from your mean</span>
       </div>
