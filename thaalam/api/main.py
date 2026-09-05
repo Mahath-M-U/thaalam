@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from thaalam.api.middleware import RequestContextMiddleware
 from thaalam.api.routes import briefs, data, derived, health, oauth, webhooks
 from thaalam.config import get_settings
 from thaalam.logging_config import setup_logging
@@ -40,6 +41,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Added last so it wraps everything else and every request gets logged once,
+# with a correlation id, whatever the inner layers do.
+app.add_middleware(RequestContextMiddleware)
 
 app.include_router(health.router)
 app.include_router(data.router)
