@@ -18,8 +18,49 @@ import type {
   WorkoutRecord,
 } from "./types";
 
+export const CSRF_COOKIE = "thaalam_csrf";
+const CSRF_HEADER = "X-CSRF-Token";
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+/** Notified when the server says the session is gone. */
+let onUnauthorized: (() => void) | null = null;
+
+export function setUnauthorizedHandler(handler: (() => void) | null): void {
+  onUnauthorized = handler;
+}
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+function readCookie(name: string): string {
+  const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : "";
+}
+
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, init);
+  const method = (init?.method ?? "GET").toUpperCase();
+  const headers = new Headers(init?.headers);
+
+  // The CSRF cookie is readable on purpose: echoing it back as a header is
+  // what a cross-site caller cannot do.
+  if (!SAFE_METHODS.has(method)) {
+    headers.set(CSRF_HEADER, readCookie(CSRF_COOKIE));
+  }
+
+  const res = await fetch(path, {
+    ...init,
+    headers,
+    // Same-origin in production; the Vite proxy keeps dev same-origin too.
+    credentials: "same-origin",
+  });
+
   if (!res.ok) {
     let detail = res.statusText;
     try {
@@ -28,9 +69,27 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       /* ignore parse errors */
     }
-    throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+    // Handled centrally so the dashboard's ~10 parallel reads collapse into
+    // one trip back to the login screen rather than ten.
+    if (res.status === 401) {
+      onUnauthorized?.();
+    }
+    throw new ApiError(
+      typeof detail === "string" ? detail : JSON.stringify(detail),
+      res.status,
+    );
+  }
+  if (res.status === 204) {
+    return undefined as T;
   }
   return res.json() as Promise<T>;
+}
+
+export interface CurrentUser {
+  email: string;
+  role: "admin" | "viewer";
+  must_change_password: boolean;
+  csrf_token: string;
 }
 
 export const api = {
@@ -45,7 +104,9 @@ export const api = {
   sleepStages: () => requestJson<{ stages: SleepStage[]; nights?: number }>("/api/sleep/stages/average"),
   workoutsBySport: () => requestJson<{ sports: SportStrain[] }>("/api/workouts/by-sport"),
   insights: () => requestJson<InsightsResponse>("/api/insights"),
-  dailyBrief: () => requestJson<DailyBriefResponse>("/api/brief"),
+  // POST because it writes a row to insight_briefs, which puts it behind
+  // CSRF protection.
+  dailyBrief: () => requestJson<DailyBriefResponse>("/api/brief", { method: "POST" }),
   briefExplain: (question: string) =>
     requestJson<BriefExplainerResponse>(`/api/brief/explain?question=${encodeURIComponent(question)}`),
   sync: () => requestJson<{ ok: boolean }>("/api/sync", { method: "POST" }),
@@ -54,4 +115,22 @@ export const api = {
   derivedReadDive: (id: string) =>
     requestJson<DerivedReadDiveResponse>(`/api/derived/reads/${encodeURIComponent(id)}`),
   derivedRunway: () => requestJson<RunwayResponse>("/api/derived/runway"),
+
+  me: () => requestJson<CurrentUser>("/api/auth/me"),
+  login: (email: string, password: string) =>
+    requestJson<CurrentUser>("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    }),
+  logout: () => requestJson<void>("/api/auth/logout", { method: "POST" }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    requestJson<CurrentUser>("/api/auth/password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        current_password: currentPassword,
+        new_password: newPassword,
+      }),
+    }),
 };

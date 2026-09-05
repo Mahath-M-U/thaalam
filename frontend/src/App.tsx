@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useAuth } from "./auth/AuthContext";
 import { HrvRhrChart } from "./components/charts/HrvRhrChart";
 import { RecoveryChart } from "./components/charts/RecoveryChart";
 import { SleepStagesChart } from "./components/charts/SleepStagesChart";
@@ -64,6 +65,7 @@ const NAV: { id: SectionId | "reads"; label: string }[] = [
 
 export default function App() {
   const { data, loading, error, reload } = useDashboardData();
+  const { user, isAdmin, signOut } = useAuth();
   const isMobile = useIsMobile();
   const [section, setSection] = useState<SectionId | "reads">("overview");
   const [mobileTab, setMobileTab] = useState<MobileTab>("today");
@@ -284,14 +286,17 @@ export default function App() {
         </nav>
 
         <div className="sidebar-foot">
-          <button
-            type="button"
-            className="btn ghost"
-            disabled={syncing}
-            onClick={() => void handleRefresh()}
-          >
-            {syncing ? "Syncing…" : "Refresh data"}
-          </button>
+          {/* Sync is admin-only server-side; don't offer a viewer a 403. */}
+          {isAdmin ? (
+            <button
+              type="button"
+              className="btn ghost"
+              disabled={syncing}
+              onClick={() => void handleRefresh()}
+            >
+              {syncing ? "Syncing…" : "Refresh data"}
+            </button>
+          ) : null}
           <div className="baseline-card">
             <div className="baseline-kicker">Your baseline</div>
             <p>
@@ -299,11 +304,15 @@ export default function App() {
               {sessionCount === 1 ? "session" : "sessions"} of your own data
             </p>
           </div>
-          <p className="muted">
-            API on <code>:8000</code>
-            <br />
-            Sync with <code>uv run main.py</code>
-          </p>
+          <div className="sidebar-account">
+            <span className="account-email" title={user?.email}>
+              {user?.email}
+            </span>
+            <span className="account-role">{user?.role}</span>
+            <button type="button" className="btn ghost" onClick={() => void signOut()}>
+              Sign out
+            </button>
+          </div>
         </div>
       </aside>
 
