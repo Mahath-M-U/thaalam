@@ -13,14 +13,14 @@ from typing import Any
 import duckdb
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from thaalam.api.deps import get_readonly_connection, get_writable_connection
+from thaalam.api.deps import get_readonly_connection, get_writable_connection, require_user
 from thaalam.db import record_insight_brief
 from thaalam.repositories import queries
 from thaalam.services.brief_service import EXPLAINERS, answer_explainer, build_snapshot, compose_brief
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api", tags=["brief"])
+router = APIRouter(prefix="/api", tags=["brief"], dependencies=[Depends(require_user)])
 
 
 def _resolve_user_id(con: duckdb.DuckDBPyConnection, user_id: int | None) -> int | None:
@@ -33,12 +33,16 @@ def _resolve_user_id(con: duckdb.DuckDBPyConnection, user_id: int | None) -> int
     return int(profile.iloc[0]["user_id"])
 
 
-@router.get("/brief")
+@router.post("/brief")
 def get_daily_brief(
     user_id: int | None = Query(default=None, description="Defaults to the synced WHOOP profile's user_id"),
     con: duckdb.DuckDBPyConnection = Depends(get_writable_connection),
 ) -> dict[str, Any]:
-    """Composed daily brief text + the rule ids that fired, logged to `insight_briefs`."""
+    """Composed daily brief text + the rule ids that fired, logged to `insight_briefs`.
+
+    A POST, not a GET: it writes a row to `insight_briefs`, and CSRF
+    protection only covers unsafe methods.
+    """
     snapshot = build_snapshot(con)
     if snapshot is None:
         return {

@@ -7,11 +7,16 @@ from typing import Any
 import duckdb
 from fastapi import APIRouter, Depends
 
-from thaalam.api.deps import get_readonly_connection
+from thaalam.api.deps import get_readonly_connection, require_user
 from thaalam.db import get_derived_baseline, get_derived_runway
 from thaalam.services.runway_service import compute_runway
 
-router = APIRouter(prefix="/api/derived", tags=["derived"])
+# Applied at the router so a route added later is guarded by default.
+router = APIRouter(
+    prefix="/api/derived",
+    tags=["derived"],
+    dependencies=[Depends(require_user)],
+)
 
 
 @router.get("/baselines")

@@ -26,10 +26,17 @@ settings = get_settings()
 settings.validate_runtime()
 setup_logging()
 
+# The schema names every route and its shape. Useful in dev, needless
+# reconnaissance for an unauthenticated caller in production.
+_docs_enabled = not settings.is_production
+
 app = FastAPI(
     title="Thaalam API",
-    description="Local WHOOP health data API (DuckDB-backed).",
+    description="WHOOP health data API (DuckDB-backed).",
     version="0.2.0",
+    docs_url="/docs" if _docs_enabled else None,
+    redoc_url="/redoc" if _docs_enabled else None,
+    openapi_url="/openapi.json" if _docs_enabled else None,
 )
 
 # Vite dev origins by default; empty in production, where the packaged app

@@ -9,18 +9,26 @@ from __future__ import annotations
 
 import json
 import logging
+import sqlite3
 from typing import Any
 
 import duckdb
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from thaalam.api.deps import (
     acquire_writable_connection,
     build_whoop_client,
+    client_ip,
+    get_auth_db,
     get_readonly_connection,
     is_whoop_connected,
+    require_admin,
+    require_user,
 )
 from thaalam.api.serializers import dataframe_to_records, first_record
+from thaalam.auth import store as auth_store
+from thaalam.auth.sessions import AuthenticatedUser
+from thaalam.logging_config import request_id_var
 from thaalam.repositories import queries
 from thaalam.services import report_service
 from thaalam.services.derived_metrics import recompute
@@ -29,7 +37,9 @@ from thaalam.sync import sync_all_historical_data
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api", tags=["data"])
+# Applied at the router so a route added later is guarded by default; the
+# sync route below additionally narrows to admins.
+router = APIRouter(prefix="/api", tags=["data"], dependencies=[Depends(require_user)])
 
 
 @router.get("/profile")
@@ -292,10 +302,25 @@ def get_insights(
 
 
 @router.post("/sync")
-def post_sync() -> dict[str, Any]:
-    """Manual Refresh override: run the same server-side WHOOP sync as nightly."""
+def post_sync(
+    request: Request,
+    user: AuthenticatedUser = Depends(require_admin),
+    auth_con: sqlite3.Connection = Depends(get_auth_db),
+) -> dict[str, Any]:
+    """Manual Refresh override: run the same server-side WHOOP sync as nightly.
+
+    Admin-only: it spends the WHOOP API rate budget and writes to the database.
+    """
     if not is_whoop_connected():
         raise HTTPException(status_code=409, detail="WHOOP is not connected")
+    auth_store.record_audit(
+        auth_con,
+        "whoop.sync_triggered",
+        user_id=user.id,
+        actor_email=user.email,
+        client_ip=client_ip(request),
+        request_id=request_id_var.get(),
+    )
     client = build_whoop_client()
     con = acquire_writable_connection()
     try:
