@@ -1,5 +1,5 @@
 import { Area, ComposedChart, Line, ReferenceLine, ResponsiveContainer, YAxis } from "recharts";
-import { AMBER } from "../chartTheme";
+import { INK, MUTED, WASH_MINT } from "../chartTheme";
 import type { RunwayResponse } from "../types";
 
 interface ChartRow {
@@ -109,7 +109,7 @@ export function RunwayChart({ runway, height = 180 }: { runway: RunwayResponse; 
         <ComposedChart data={data} margin={{ top: 10, right: 8, left: 8, bottom: 0 }}>
           <YAxis domain={[min - pad, max + pad]} hide />
           {baseline != null && (
-            <ReferenceLine y={baseline} stroke={AMBER} strokeDasharray="3 5" strokeWidth={1.5} />
+            <ReferenceLine y={baseline} stroke={INK} strokeDasharray="3 5" strokeWidth={1.5} />
           )}
           <Area
             type="linear"
@@ -124,14 +124,14 @@ export function RunwayChart({ runway, height = 180 }: { runway: RunwayResponse; 
             dataKey="cone"
             stackId="cone"
             stroke="none"
-            fill={AMBER}
-            fillOpacity={0.14}
+            fill={WASH_MINT}
+            fillOpacity={0.6}
             isAnimationActive={false}
           />
           <Line
             type="linear"
             dataKey="value"
-            stroke="#FFFFFF"
+            stroke={MUTED}
             strokeWidth={2}
             dot={false}
             activeDot={false}
@@ -140,7 +140,7 @@ export function RunwayChart({ runway, height = 180 }: { runway: RunwayResponse; 
           <Line
             type="linear"
             dataKey="yhat"
-            stroke={AMBER}
+            stroke={INK}
             strokeWidth={2}
             strokeDasharray="6 5"
             isAnimationActive={false}
@@ -154,8 +154,8 @@ export function RunwayChart({ runway, height = 180 }: { runway: RunwayResponse; 
                   cx={cx}
                   cy={cy}
                   r={5}
-                  fill={AMBER}
-                  stroke="#1A1A1A"
+                  fill={INK}
+                  stroke="#ffffff"
                   strokeWidth={2}
                 />
               );

@@ -13,7 +13,7 @@ import type { DerivedRead, StrainScatterPoint } from "../../types";
 import { ChartCard } from "../ChartCard";
 import { CalibratingNote, DeepDive } from "../DeepDive";
 import { shortDate } from "../../utils";
-import { AMBER, axisLine, axisTick, CHART_COLORS, gridStroke, tooltipStyle } from "../../chartTheme";
+import { INK, MUTED_SOFT, axisLine, axisTick, CHART_COLORS, gridStroke, tooltipStyle } from "../../chartTheme";
 
 interface Dive {
   scatter?: StrainScatterPoint[];
@@ -81,9 +81,9 @@ export function StrainSensitivityDive({ read, dive, onBack }: Props) {
                   width={44}
                 />
                 <Tooltip contentStyle={tooltipStyle} />
-                <Scatter name="Mornings" data={points} fill="#8A8A8A" />
+                <Scatter name="Mornings" data={points} fill={MUTED_SOFT} />
                 {fit.length === 2 ? (
-                  <Scatter name="Fitted slope" data={fit} fill={AMBER} line={{ stroke: AMBER, strokeWidth: 2 }} shape={() => <g />} />
+                  <Scatter name="Fitted slope" data={fit} fill={INK} line={{ stroke: INK, strokeWidth: 2 }} shape={() => <g />} />
                 ) : null}
               </ScatterChart>
             </ResponsiveContainer>
@@ -145,9 +145,9 @@ export function StrainSensitivityPreview({
           <XAxis type="number" dataKey="strain" tick={axisTick} axisLine={axisLine} tickLine={false} />
           <YAxis type="number" dataKey="hrv" tick={axisTick} axisLine={false} tickLine={false} width={36} />
           <Tooltip contentStyle={tooltipStyle} />
-          <Scatter data={points} fill="#8A8A8A" />
+          <Scatter data={points} fill={MUTED_SOFT} />
           {fit.length === 2 ? (
-            <Scatter data={fit} fill={AMBER} line={{ stroke: AMBER, strokeWidth: 2 }} shape={() => <g />} />
+            <Scatter data={fit} fill={INK} line={{ stroke: INK, strokeWidth: 2 }} shape={() => <g />} />
           ) : null}
         </ScatterChart>
       </ResponsiveContainer>

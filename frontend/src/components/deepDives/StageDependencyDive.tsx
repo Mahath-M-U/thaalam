@@ -3,12 +3,12 @@ import type { DerivedRead, StageVarianceSlice } from "../../types";
 import { ChartCard } from "../ChartCard";
 import { CalibratingNote, DeepDive } from "../DeepDive";
 import { shortDate } from "../../utils";
-import { AMBER, AMBER_35, axisLine, axisTick, gridStroke, tooltipStyle } from "../../chartTheme";
+import { INK, INK_35, INK_60, MUTED_SOFT, axisLine, axisTick, gridStroke, tooltipStyle } from "../../chartTheme";
 
 const STAGE_COLORS: Record<string, string> = {
-  REM: AMBER,
-  Deep: "#8A6A00",
-  Light: "#666666",
+  REM: INK,
+  Deep: INK_60,
+  Light: "#d6d3d1",
 };
 
 interface StackedNight {
@@ -72,11 +72,11 @@ export function StageDependencyDive({ read, dive, onBack }: Props) {
                     innerRadius={62}
                     outerRadius={90}
                     paddingAngle={2}
-                    stroke="#1A1A1A"
+                    stroke="#ffffff"
                     strokeWidth={2}
                   >
                     {variance.map((s) => (
-                      <Cell key={s.stage} fill={STAGE_COLORS[s.stage] ?? "#8A8A8A"} />
+                      <Cell key={s.stage} fill={STAGE_COLORS[s.stage] ?? MUTED_SOFT} />
                     ))}
                   </Pie>
                   <Tooltip
@@ -96,7 +96,7 @@ export function StageDependencyDive({ read, dive, onBack }: Props) {
             <ul className="stage-legend">
               {variance.map((s) => (
                 <li key={s.stage}>
-                  <span className="swatch" style={{ background: STAGE_COLORS[s.stage] ?? "#8A8A8A" }} />
+                  <span className="swatch" style={{ background: STAGE_COLORS[s.stage] ?? MUTED_SOFT }} />
                   {s.stage}
                   <em>{(s.pct ?? 0).toFixed(0)}%</em>
                 </li>
@@ -117,22 +117,22 @@ export function StageDependencyDive({ read, dive, onBack }: Props) {
               <XAxis dataKey="label" tick={axisTick} axisLine={axisLine} tickLine={false} minTickGap={16} />
               <YAxis tick={axisTick} axisLine={false} tickLine={false} width={32} />
               <Tooltip contentStyle={tooltipStyle} />
-              <Area type="monotone" dataKey="deep" name="Deep" stackId="s" stroke="none" fill={AMBER_35} />
-              <Area type="monotone" dataKey="rem" name="REM" stackId="s" stroke="none" fill={AMBER} />
-              <Area type="monotone" dataKey="light" name="Light" stackId="s" stroke="none" fill="#666666" />
+              <Area type="monotone" dataKey="deep" name="Deep" stackId="s" stroke="none" fill={INK_35} />
+              <Area type="monotone" dataKey="rem" name="REM" stackId="s" stroke="none" fill={INK} />
+              <Area type="monotone" dataKey="light" name="Light" stackId="s" stroke="none" fill="#d6d3d1" />
             </AreaChart>
           </ResponsiveContainer>
           <ul className="stage-legend">
             <li>
-              <span className="swatch" style={{ background: AMBER }} />
+              <span className="swatch" style={{ background: INK }} />
               REM
             </li>
             <li>
-              <span className="swatch" style={{ background: AMBER_35 }} />
+              <span className="swatch" style={{ background: INK_35 }} />
               Deep
             </li>
             <li>
-              <span className="swatch" style={{ background: "#666666" }} />
+              <span className="swatch" style={{ background: "#d6d3d1" }} />
               Light
             </li>
           </ul>
@@ -180,11 +180,11 @@ export function StageDependencyPreview({
               innerRadius={48}
               outerRadius={72}
               paddingAngle={2}
-              stroke="#1A1A1A"
+              stroke="#ffffff"
               strokeWidth={2}
             >
               {variance.map((s) => (
-                <Cell key={s.stage} fill={STAGE_COLORS[s.stage] ?? "#8A8A8A"} />
+                <Cell key={s.stage} fill={STAGE_COLORS[s.stage] ?? MUTED_SOFT} />
               ))}
             </Pie>
           </PieChart>

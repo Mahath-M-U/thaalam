@@ -1,33 +1,82 @@
 :root {
-  color-scheme: dark;
-  --canvas: #000000;
-  --surface-card: #1a1a1a;
-  --chrome: #131313;
-  --ink: #ffffff;
-  --body: #c0c0c0;
-  --body-strong: #ffffff;
-  --muted: #8a8a8a;
-  --muted-soft: #666666;
-  --hairline: #333333;
-  --amber: #ffc400;
-  --amber-60: rgba(255, 196, 0, 0.6);
-  --amber-45: rgba(255, 196, 0, 0.45);
-  --amber-35: rgba(255, 196, 0, 0.35);
-  --emerald: #10b981;
-  --on-primary: #000000;
-  --font: "Roboto", -apple-system, "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+
+  /* Surface — off-white page floor, pure white cards */
+  --canvas: #f5f5f5;
+  --canvas-soft: #fafafa;
+  --surface-card: #ffffff;
+  --surface-strong: #f0efed;
+  --chrome: #f0efed;
+
+  /* Text — warm near-black ink over a warm grey ramp */
+  --ink: #0c0a09;
+  --body: #4e4e4e;
+  --body-strong: #292524;
+  /* design.md specifies #777169; that lands at 4.43:1 on the off-white canvas,
+     just under AA for body copy. Four units darker clears 4.5:1 everywhere and
+     is indistinguishable at these sizes. */
+  --muted: #736d65;
+  --muted-soft: #a8a29e;
+  --on-primary: #ffffff;
+
+  /* Hairlines */
+  --hairline: #e7e5e4;
+  --hairline-soft: #f0efed;
+  --hairline-strong: #d6d3d1;
+
+  /* Action — the ink pill is the only CTA colour in the system */
+  --primary: #292524;
+  --primary-active: #0c0a09;
+
+  /* Ink ladder. Replaces the old amber ladder as the data ramp: severity
+     reads as distance from your own band, never as hue. */
+  --ink-60: rgba(12, 10, 9, 0.6);
+  --ink-35: rgba(12, 10, 9, 0.35);
+  --ink-14: rgba(12, 10, 9, 0.14);
+  --ink-08: rgba(12, 10, 9, 0.08);
+
+  /* Atmospheric gradient stops. Orbs and low-alpha area fills only —
+     never a stroke, a dot, a button fill, or a text colour. */
+  --grad-mint: #a7e5d3;
+  --grad-peach: #f4c5a8;
+  --grad-lavender: #c8b8e0;
+  --grad-sky: #a8c8e8;
+  --grad-rose: #e8b8c4;
+  --orb-mint: rgba(167, 229, 211, 0.34);
+  --orb-peach: rgba(244, 197, 168, 0.34);
+  --orb-lavender: rgba(200, 184, 224, 0.3);
+
+  /* Semantic — form validation only, never data */
+  --success: #16a34a;
+  --error: #dc2626;
+
+  /* Type — EB Garamond 300 is the documented stand-in for Waldenburg Light */
+  --font: "Inter", -apple-system, "Segoe UI", system-ui, sans-serif;
+  --font-display: "EB Garamond", "Times New Roman", serif;
+
+  /* Spacing, 4px base */
+  --space-xxs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-base: 16px;
+  --space-md: 20px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-xxl: 48px;
+  --space-section: 96px;
+
   --sidebar-w: 222px;
-  --radius-sm: 10px;
+  --radius-sm: 8px;
   --radius: 16px;
-  --radius-lg: 22px;
+  --radius-lg: 24px;
   --radius-pill: 9999px;
-  --shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+
   font-family: var(--font);
   line-height: 1.5;
   font-weight: 400;
   letter-spacing: 0.16px;
   color: var(--body);
-  background: var(--canvas);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -88,15 +137,17 @@ code {
   height: auto;
   display: grid;
   place-items: center;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-weight: 300;
   font-size: 1.35rem;
-  color: var(--amber);
+  color: var(--ink);
   line-height: 1;
 }
 
 .brand strong {
   display: block;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-weight: 300;
   font-size: 0.92rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -105,7 +156,7 @@ code {
 
 .brand small {
   display: block;
-  color: var(--amber);
+  color: var(--body);
   font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.18em;
@@ -140,11 +191,11 @@ code {
 
 .nav button.active {
   background: var(--chrome);
-  color: var(--amber);
+  color: var(--ink);
 }
 
 .nav button.active.nav-home {
-  color: var(--emerald);
+  color: var(--ink);
 }
 
 .sidebar-foot {
@@ -159,6 +210,7 @@ code {
   background: var(--chrome);
   border-radius: var(--radius);
   padding: 0.85rem 0.9rem;
+  border: 1px solid var(--hairline);
   box-shadow: var(--shadow);
 }
 
@@ -167,7 +219,7 @@ code {
   font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--amber);
+  color: var(--body);
   margin: 0 0 0.4rem;
 }
 
@@ -200,8 +252,9 @@ code {
 
 .topbar h1 {
   margin: 0 0 0.35rem;
-  font-weight: 700;
-  font-size: 1.75rem;
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 36px;
   letter-spacing: -0.02em;
   color: var(--ink);
 }
@@ -237,8 +290,8 @@ code {
 }
 
 .chip.active {
-  background: var(--amber);
-  border-color: var(--amber);
+  background: var(--primary);
+  border-color: var(--primary);
   color: var(--on-primary);
 }
 
@@ -262,7 +315,7 @@ code {
   font-size: 0.9rem;
   font-weight: 500;
   cursor: pointer;
-  background: var(--amber);
+  background: var(--primary);
   color: var(--on-primary);
   transition: opacity 0.15s ease;
 }
@@ -279,7 +332,7 @@ code {
 }
 
 .btn.ghost:hover {
-  border-color: var(--amber);
+  border-color: var(--ink);
   background: var(--chrome);
 }
 
@@ -294,6 +347,7 @@ code {
   background: var(--surface-card);
   border-radius: var(--radius);
   padding: 1rem 1.1rem;
+  border: 1px solid var(--hairline);
   box-shadow: var(--shadow);
 }
 
@@ -302,7 +356,7 @@ code {
 }
 
 .stat-label {
-  color: var(--muted);
+  color: var(--body);
   font-size: 10px;
   font-weight: 500;
   text-transform: uppercase;
@@ -311,8 +365,9 @@ code {
 }
 
 .stat-value {
-  font-size: 1.7rem;
-  font-weight: 700;
+  font-size: 2rem;
+  font-family: var(--font-display);
+  font-weight: 300;
   color: var(--ink);
   letter-spacing: -0.02em;
   line-height: 1.15;
@@ -354,7 +409,7 @@ code {
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.14em;
-  color: var(--amber);
+  color: var(--body);
 }
 
 .chart-grid {
@@ -367,6 +422,7 @@ code {
   background: var(--surface-card);
   border-radius: var(--radius);
   padding: 1.1rem 1.2rem 0.75rem;
+  border: 1px solid var(--hairline);
   box-shadow: var(--shadow);
   transition: box-shadow 0.15s ease;
   min-width: 0;
@@ -450,7 +506,7 @@ code {
   margin-left: auto;
   font-style: normal;
   color: var(--ink);
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .swatch {
@@ -469,6 +525,7 @@ code {
   flex-direction: column;
   align-items: center;
   gap: 0.75rem;
+  border: 1px solid var(--hairline);
   box-shadow: var(--shadow);
 }
 
@@ -487,7 +544,7 @@ code {
   height: 36px;
   border-radius: 50%;
   border: 3px solid var(--hairline);
-  border-top-color: var(--amber);
+  border-top-color: var(--ink);
   animation: spin 0.8s linear infinite;
 }
 
@@ -526,6 +583,7 @@ code {
   background: var(--surface-card);
   border-radius: var(--radius);
   padding: 1rem 1.1rem;
+  border: 1px solid var(--hairline);
   box-shadow: var(--shadow);
 }
 
@@ -540,7 +598,7 @@ code {
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--amber);
+  color: var(--body);
   font-weight: 500;
 }
 
@@ -552,8 +610,9 @@ code {
 }
 
 .insight-value {
-  font-size: 1.6rem;
-  font-weight: 700;
+  font-size: 1.9rem;
+  font-family: var(--font-display);
+  font-weight: 300;
   color: var(--ink);
   letter-spacing: -0.02em;
   line-height: 1.15;
@@ -605,7 +664,7 @@ code {
 }
 
 .brief-question-btn.active {
-  border-color: var(--amber);
+  border-color: var(--ink);
   background: var(--chrome);
   color: var(--ink);
 }
@@ -657,7 +716,7 @@ code {
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--muted);
+  color: var(--body);
 }
 
 .sleep-latest-grid strong {
@@ -701,7 +760,7 @@ code {
 .data-table td {
   padding: 0.45rem 0.5rem;
   text-align: right;
-  border-bottom: 1px solid #1f1f1f;
+  border-bottom: 1px solid var(--hairline);
   white-space: nowrap;
 }
 
@@ -713,7 +772,7 @@ code {
 }
 
 .data-table th {
-  color: var(--amber);
+  color: var(--body);
   font-weight: 500;
   font-size: 12px;
   text-transform: uppercase;
@@ -724,20 +783,20 @@ code {
 }
 
 .data-table tbody tr:hover {
-  background: #1f1f1f;
+  background: var(--canvas-soft);
 }
 
 .data-table td.warn {
-  color: var(--amber-35);
+  color: var(--ink-35);
   font-weight: 500;
 }
 
 .data-table td.mild {
-  color: var(--amber-60);
+  color: var(--ink-60);
 }
 
 .data-table td.ok {
-  color: var(--amber);
+  color: var(--ink);
 }
 
 .badge {
@@ -749,13 +808,13 @@ code {
 }
 
 .badge.main {
-  background: var(--amber);
+  background: var(--ink);
   color: var(--on-primary);
 }
 
 .badge.nap {
-  background: var(--amber-45);
-  color: var(--on-primary);
+  background: var(--surface-strong);
+  color: var(--ink);
 }
 
 .nowrap {
@@ -777,7 +836,7 @@ code {
 
 .compare-stat span {
   display: block;
-  color: var(--muted);
+  color: var(--body);
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -792,11 +851,11 @@ code {
 }
 
 .compare-stat strong.pos {
-  color: var(--amber);
+  color: var(--ink);
 }
 
 .compare-stat strong.neg {
-  color: var(--amber-45);
+  color: var(--muted);
 }
 
 .compare-stat em {
@@ -858,6 +917,7 @@ code {
 .score-ring-card {
   background: var(--surface-card);
   border-radius: var(--radius-lg);
+  border: 1px solid var(--hairline);
   box-shadow: var(--shadow);
   margin-bottom: 1.5rem;
   max-width: 520px;
@@ -882,7 +942,7 @@ code {
 }
 
 .score-ring-open:hover {
-  background: #1f1f1f;
+  background: var(--canvas-soft);
 }
 
 .score-ring-top {
@@ -912,8 +972,9 @@ code {
 }
 
 .score-ring-center strong {
-  font-size: 1.85rem;
-  font-weight: 700;
+  font-size: 2.15rem;
+  font-family: var(--font-display);
+  font-weight: 300;
   color: var(--ink);
   letter-spacing: -0.03em;
 }
@@ -930,7 +991,7 @@ code {
   font-weight: 500;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--amber);
+  color: var(--body);
   margin-top: 0.25rem;
 }
 
@@ -954,13 +1015,13 @@ code {
   font-weight: 500;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--body);
 }
 
 .score-meter-track,
 .score-part-track {
   height: 6px;
-  background: #2a2a2a;
+  background: var(--surface-strong);
   border-radius: var(--radius-pill);
   overflow: hidden;
 }
@@ -969,15 +1030,15 @@ code {
 .score-part-fill {
   height: 100%;
   border-radius: var(--radius-pill);
-  background: var(--amber);
+  background: var(--ink);
 }
 
-.score-meter-fill.white {
-  background: #ffffff;
+.score-meter-fill.soft {
+  background: var(--ink-35);
 }
 
-.score-meter-fill.amber {
-  background: var(--amber);
+.score-meter-fill.ink {
+  background: var(--ink);
 }
 
 .score-meter-value {
@@ -1000,13 +1061,13 @@ code {
   font-weight: 500;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--body);
 }
 
 .score-delta {
   font-size: 0.8rem;
   font-weight: 500;
-  color: var(--amber);
+  color: var(--body-strong);
 }
 
 .score-parts {
@@ -1047,13 +1108,13 @@ code {
 }
 
 .score-waiting {
-  color: var(--amber-60);
+  color: var(--muted);
 }
 
 .vitality-dive-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.72);
+  background: rgba(12, 10, 9, 0.4);
   z-index: 40;
   display: flex;
   justify-content: center;
@@ -1065,6 +1126,7 @@ code {
 .vitality-dive {
   background: var(--surface-card);
   border-radius: var(--radius-lg);
+  border: 1px solid var(--hairline);
   box-shadow: var(--shadow);
   width: min(860px, 100%);
   padding: 1.4rem 1.5rem 1.6rem;
@@ -1085,7 +1147,7 @@ code {
   font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--amber);
+  color: var(--body);
 }
 
 .vitality-dive-head h2 {
@@ -1141,13 +1203,13 @@ code {
   height: 14px;
   border-radius: var(--radius-pill);
   overflow: hidden;
-  background: #2a2a2a;
+  background: var(--surface-strong);
   margin: 0.4rem 0 0.65rem;
 }
 
 .stacked-pts-seg {
   height: 100%;
-  background: var(--amber);
+  background: var(--ink);
 }
 
 .stacked-pts-legend {
@@ -1183,7 +1245,7 @@ code {
   font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--amber);
+  color: var(--body);
 }
 
 .dive-parts {
@@ -1274,7 +1336,7 @@ code {
   font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--amber);
+  color: var(--body);
   margin: 0 0 0.55rem;
 }
 
@@ -1300,13 +1362,14 @@ code {
   color: inherit;
   border-radius: var(--radius);
   padding: 0.95rem 1.1rem;
+  border: 1px solid var(--hairline);
   box-shadow: var(--shadow);
   cursor: pointer;
   font: inherit;
 }
 
 .read-row:hover {
-  background: #1f1f1f;
+  background: var(--canvas-soft);
 }
 
 .read-row-copy h3 {
@@ -1371,14 +1434,15 @@ code {
   font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--amber);
+  color: var(--body);
   margin-bottom: 0.35rem;
 }
 
 .deep-dive h2 {
   margin: 0 0 0.35rem;
-  font-size: 1.7rem;
-  font-weight: 700;
+  font-size: 2rem;
+  font-family: var(--font-display);
+  font-weight: 300;
   color: var(--ink);
   letter-spacing: -0.02em;
 }
@@ -1402,6 +1466,7 @@ code {
   background: var(--surface-card);
   border-radius: var(--radius);
   padding: 1rem 1.1rem;
+  border: 1px solid var(--hairline);
   box-shadow: var(--shadow);
   margin-bottom: 1rem;
 }
@@ -1411,7 +1476,7 @@ code {
   font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--amber);
+  color: var(--body);
   margin-bottom: 0.4rem;
 }
 
@@ -1426,6 +1491,7 @@ code {
   background: var(--surface-card);
   border-radius: var(--radius);
   padding: 1.25rem 1.1rem;
+  border: 1px solid var(--hairline);
   box-shadow: var(--shadow);
 }
 
@@ -1445,7 +1511,7 @@ code {
 .calibrating-bar span {
   display: block;
   height: 100%;
-  background: var(--amber);
+  background: var(--ink);
 }
 
 .sport-tabs {
@@ -1470,19 +1536,21 @@ code {
   background: var(--surface-card);
   border-radius: var(--radius);
   padding: 1.1rem 1.2rem;
+  border: 1px solid var(--hairline);
   box-shadow: var(--shadow);
 }
 
 .generic-value {
   font-size: 2rem;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-weight: 300;
   color: var(--ink);
   letter-spacing: -0.02em;
 }
 
 .generic-delta {
   margin: 0.2rem 0 0.75rem;
-  color: var(--amber);
+  color: var(--body-strong);
   font-size: 0.85rem;
 }
 
@@ -1494,9 +1562,10 @@ code {
 .four-up-value {
   display: block;
   text-align: right;
-  font-size: 1.35rem;
-  font-weight: 700;
-  color: var(--amber);
+  font-size: 1.55rem;
+  font-family: var(--font-display);
+  font-weight: 300;
+  color: var(--ink);
   margin: -0.25rem 0 0.35rem;
 }
 
@@ -1516,7 +1585,7 @@ code {
 }
 
 .insight-card.clickable:hover {
-  background: #1f1f1f;
+  background: var(--canvas-soft);
 }
 
 .sport-efficiency {
@@ -1542,7 +1611,7 @@ code {
 }
 
 .sport-efficiency .linkish span {
-  color: var(--amber);
+  color: var(--ink);
   font-weight: 500;
 }
 
@@ -1561,7 +1630,7 @@ code {
 
 .heat-cal-head span {
   font-size: 10px;
-  color: var(--muted);
+  color: var(--body);
   text-align: center;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1621,6 +1690,7 @@ code {
 .runway-card {
   background: var(--surface-card);
   border-radius: var(--radius);
+  border: 1px solid var(--hairline);
   box-shadow: var(--shadow);
   min-width: 0;
   padding: 1.1rem 1.25rem 0.9rem;
@@ -1640,7 +1710,7 @@ code {
   font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--body);
   margin: 0 0 0.4rem;
 }
 
@@ -1653,8 +1723,9 @@ code {
 }
 
 .runway-title strong {
-  font-size: 1.55rem;
-  font-weight: 700;
+  font-size: 1.8rem;
+  font-family: var(--font-display);
+  font-weight: 300;
   color: var(--ink);
   letter-spacing: -0.02em;
   margin-right: 0.25rem;
@@ -1673,13 +1744,13 @@ code {
   font-weight: 500;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--body);
 }
 
 .runway-chrome strong {
   display: block;
   margin-top: 0.15rem;
-  color: var(--amber);
+  color: var(--ink);
   font-size: 0.92rem;
   font-weight: 500;
 }
@@ -1725,7 +1796,7 @@ code {
   position: fixed;
   inset: 0;
   z-index: 40;
-  background: rgba(0, 0, 0, 0.72);
+  background: rgba(12, 10, 9, 0.4);
   display: flex;
   justify-content: center;
   align-items: flex-start;
@@ -1737,6 +1808,7 @@ code {
   width: min(520px, 100%);
   background: var(--canvas);
   border-radius: var(--radius-lg);
+  border: 1px solid var(--hairline);
   box-shadow: var(--shadow);
   padding: 1.15rem 1.1rem 1.4rem;
   display: flex;
@@ -1751,8 +1823,9 @@ code {
 .runway-dive-header h2 {
   margin: 0;
   color: var(--ink);
-  font-size: 1.45rem;
-  font-weight: 700;
+  font-size: 1.7rem;
+  font-family: var(--font-display);
+  font-weight: 300;
   letter-spacing: -0.02em;
 }
 
@@ -1776,6 +1849,7 @@ code {
   background: var(--surface-card);
   border-radius: var(--radius);
   padding: 0.95rem 1rem;
+  border: 1px solid var(--hairline);
   box-shadow: var(--shadow);
 }
 
@@ -1822,7 +1896,7 @@ code {
 .runway-spend-fill {
   height: 100%;
   border-radius: var(--radius-pill);
-  background: var(--amber);
+  background: var(--ink);
 }
 
 .runway-window-row {
@@ -1833,8 +1907,9 @@ code {
 }
 
 .runway-window-row strong {
-  font-size: 1.7rem;
-  font-weight: 700;
+  font-size: 2rem;
+  font-family: var(--font-display);
+  font-weight: 300;
   color: var(--ink);
   letter-spacing: -0.02em;
 }
@@ -1848,11 +1923,11 @@ code {
   width: 18px;
   height: 18px;
   border-radius: 5px;
-  background: #2a2a2a;
+  background: var(--surface-strong);
 }
 
 .runway-cells span.on {
-  background: var(--amber);
+  background: var(--ink);
 }
 
 .runway-cta {
@@ -1860,7 +1935,7 @@ code {
   margin: 0;
   padding: 0.85rem 1.15rem;
   font-size: 1rem;
-  font-weight: 700;
+  font-weight: 500;
   text-align: center;
   cursor: default;
   pointer-events: none;
@@ -1905,7 +1980,7 @@ code {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   background: var(--canvas);
-  border-top: 1px solid #1f1f1f;
+  border-top: 1px solid var(--hairline);
   padding: 0.35rem 0.4rem calc(0.45rem + env(safe-area-inset-bottom));
   padding-left: calc(0.4rem + env(safe-area-inset-left));
   padding-right: calc(0.4rem + env(safe-area-inset-right));
@@ -1922,6 +1997,7 @@ code {
   gap: 0.75rem;
   background: var(--surface-card);
   border-radius: var(--radius);
+  border: 1px solid var(--hairline);
   box-shadow: var(--shadow);
   padding: 0.8rem 0.9rem;
   margin-bottom: 0.85rem;
@@ -1944,7 +2020,7 @@ code {
   appearance: none;
   border: none;
   background: transparent;
-  color: var(--muted);
+  color: var(--body);
   font: inherit;
   font-size: 10px;
   font-weight: 500;
@@ -1964,11 +2040,11 @@ code {
 }
 
 .bottom-nav button.active {
-  color: var(--amber);
+  color: var(--ink);
 }
 
 .bottom-nav button.active.nav-home {
-  color: var(--emerald);
+  color: var(--ink);
 }
 
 .today-header {
@@ -1984,13 +2060,14 @@ code {
   font-weight: 500;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--body);
 }
 
 .today-wordmark {
   margin: 0.2rem 0 0;
-  font-size: 1.45rem;
-  font-weight: 700;
+  font-size: 1.6rem;
+  font-family: var(--font-display);
+  font-weight: 300;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ink);
@@ -2027,6 +2104,7 @@ code {
   min-width: 10.5rem;
   background: var(--surface-card);
   border-radius: var(--radius);
+  border: 1px solid var(--hairline);
   box-shadow: var(--shadow);
   padding: 0.35rem;
 }
@@ -2094,6 +2172,7 @@ code {
   font: inherit;
   text-align: left;
   border-radius: var(--radius);
+  border: 1px solid var(--hairline);
   box-shadow: var(--shadow);
   cursor: pointer;
 }
@@ -2137,7 +2216,7 @@ code {
   font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--amber);
+  color: var(--body);
   margin-bottom: 0.4rem;
 }
 
@@ -2200,8 +2279,9 @@ code {
 .signal-card strong {
   display: block;
   color: var(--ink);
-  font-size: 1.55rem;
-  font-weight: 700;
+  font-size: 1.8rem;
+  font-family: var(--font-display);
+  font-weight: 300;
   letter-spacing: -0.03em;
   line-height: 1;
 }
@@ -2211,11 +2291,11 @@ code {
   font-style: normal;
   font-size: 0.72rem;
   font-weight: 500;
-  color: var(--amber);
+  color: var(--ink);
 }
 
 .signal-card p {
-  color: var(--amber-60);
+  color: var(--muted);
   font-size: 0.72rem;
 }
 
@@ -2247,11 +2327,11 @@ code {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  border: 2px solid var(--amber);
-  color: var(--amber);
+  border: 2px solid var(--ink);
+  color: var(--ink);
   display: grid;
   place-items: center;
-  font-weight: 700;
+  font-weight: 500;
   font-size: 0.95rem;
 }
 
@@ -2264,7 +2344,7 @@ code {
   width: 100%;
   padding: 0.95rem 1.1rem;
   font-size: 1.02rem;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .mobile-reads .reads-section {
@@ -2286,7 +2366,7 @@ code {
 }
 
 .mobile-runway .runway-panel .runway-kicker {
-  color: var(--amber);
+  color: var(--muted);
 }
 
 .mobile-shell .deep-dive {
@@ -2343,6 +2423,7 @@ code {
   max-width: 26rem;
   background: var(--surface-card);
   border-radius: var(--radius);
+  border: 1px solid var(--hairline);
   box-shadow: var(--shadow);
   padding: 2rem;
   display: flex;
@@ -2359,14 +2440,15 @@ code {
 .auth-brand strong {
   display: block;
   color: var(--ink);
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-weight: 300;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .auth-brand small {
   display: block;
-  color: var(--muted);
+  color: var(--body);
   font-size: 0.625rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -2379,7 +2461,7 @@ code {
 }
 
 .auth-kicker {
-  color: var(--amber);
+  color: var(--body);
   font-size: 0.625rem;
   font-weight: 500;
   letter-spacing: 0.1em;
@@ -2401,7 +2483,7 @@ code {
 }
 
 .auth-form label {
-  color: var(--muted);
+  color: var(--body);
   font-size: 0.625rem;
   font-weight: 500;
   letter-spacing: 0.1em;
@@ -2424,7 +2506,8 @@ code {
 
 .auth-form input:focus {
   outline: none;
-  border-color: var(--amber);
+  border-color: var(--ink);
+  border-width: 2px;
 }
 
 .auth-form .btn {
@@ -2443,7 +2526,7 @@ code {
   color: var(--ink);
   font-size: 0.8125rem;
   background: var(--chrome);
-  border-left: 2px solid var(--amber);
+  border-left: 2px solid var(--error);
   border-radius: var(--radius-sm);
 }
 
@@ -2464,7 +2547,7 @@ code {
 }
 
 .sidebar-account .account-role {
-  color: var(--muted);
+  color: var(--body);
   font-size: 0.625rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -2488,7 +2571,7 @@ code {
 }
 
 .admin-kicker {
-  color: var(--amber);
+  color: var(--body);
   font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.1em;
@@ -2530,7 +2613,8 @@ code {
 .admin-invite input:focus,
 .admin-invite select:focus {
   outline: none;
-  border-color: var(--amber);
+  border-color: var(--ink);
+  border-width: 2px;
 }
 
 .admin-handover {
@@ -2539,12 +2623,12 @@ code {
   color: var(--body);
   font-size: 0.8125rem;
   background: var(--chrome);
-  border-left: 2px solid var(--amber);
+  border-left: 2px solid var(--hairline-strong);
   border-radius: var(--radius-sm);
 }
 
 .admin-handover code {
-  color: var(--amber);
+  color: var(--ink);
   user-select: all;
 }
 
@@ -2567,7 +2651,7 @@ code {
 }
 
 .auth-alt a {
-  color: var(--amber);
+  color: var(--ink);
   text-decoration: none;
 }
 
@@ -2579,4 +2663,92 @@ code {
   display: inline-block;
   margin-top: 0.375rem;
   word-break: break-all;
+}
+
+/* ---------------------------------------------------------------------------
+   Atmospheric gradient orbs
+   design.md's signature: soft pastel radial blooms drifting behind the page.
+   Pure decoration -- they hold no content, never sit under a data mark, and
+   never take a pointer event. They shrink at every breakpoint but never
+   disappear.
+--------------------------------------------------------------------------- */
+
+/* One fixed layer carrying all three blooms. Keeping them in a single
+   pseudo-element avoids any html-vs-body stacking ambiguity. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(46vmax 46vmax at 78% -8%, var(--orb-peach), transparent 62%),
+    radial-gradient(52vmax 52vmax at -8% 14%, var(--orb-mint), transparent 62%),
+    radial-gradient(56vmax 56vmax at 108% 104%, var(--orb-lavender), transparent 62%);
+}
+
+/* The shell floats above the orbs; only the body paints the canvas. */
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+.app,
+.sidebar,
+.mobile-shell,
+.auth-screen {
+  background: transparent;
+}
+
+/* Orbs shrink at every breakpoint but never disappear. */
+@media (max-width: 639px) {
+  body::before {
+    background:
+      radial-gradient(34vmax 34vmax at 84% -6%, var(--orb-peach), transparent 62%),
+      radial-gradient(38vmax 38vmax at -10% 12%, var(--orb-mint), transparent 62%),
+      radial-gradient(40vmax 40vmax at 110% 104%, var(--orb-lavender), transparent 62%);
+    opacity: 0.8;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Numerals and the ink pill's press state
+--------------------------------------------------------------------------- */
+
+/* EB Garamond has no reliable tabular figures, so every column of numbers
+   stays on Inter and asks for lining tabular digits explicitly. */
+.data-table th,
+.data-table td,
+.score-meter-value,
+.compare-stat em,
+.runway-window-row,
+.dive-parts {
+  font-variant-numeric: tabular-nums;
+}
+
+.btn:active,
+.chip.active:active {
+  background: var(--primary-active);
+  border-color: var(--primary-active);
+}
+
+/* design.md §Responsive steps the display sizes down on small screens. The
+   hero drops roughly a fifth; the dive heads follow it. */
+@media (max-width: 639px) {
+  .topbar h1 {
+    font-size: 28px;
+  }
+
+  .deep-dive h2,
+  .runway-dive-header h2 {
+    font-size: 1.6rem;
+  }
+
+  .stat-value {
+    font-size: 1.75rem;
+  }
+
+  .score-ring-center strong {
+    font-size: 1.95rem;
+  }
 }

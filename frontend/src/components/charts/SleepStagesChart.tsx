@@ -1,13 +1,13 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import type { SleepStage } from "../../types";
 import { ChartCard } from "../ChartCard";
-import { AMBER, AMBER_35, AMBER_60, tooltipStyle } from "../../chartTheme";
+import { INK, INK_35, INK_60, MUTED_SOFT, tooltipStyle } from "../../chartTheme";
 
 const COLORS: Record<string, string> = {
-  Light: AMBER_35,
-  "Deep (SWS)": AMBER,
-  REM: AMBER_60,
-  Awake: "#666666",
+  Light: INK_35,
+  "Deep (SWS)": INK,
+  REM: INK_60,
+  Awake: "#d6d3d1",
 };
 
 interface Props {
@@ -42,11 +42,11 @@ export function SleepStagesChart({ stages }: Props) {
               innerRadius={62}
               outerRadius={90}
               paddingAngle={2}
-              stroke="#1A1A1A"
+              stroke="#ffffff"
               strokeWidth={2}
             >
               {stages.map((s) => (
-                <Cell key={s.stage} fill={COLORS[s.stage] ?? "#8A8A8A"} />
+                <Cell key={s.stage} fill={COLORS[s.stage] ?? MUTED_SOFT} />
               ))}
             </Pie>
             <Tooltip
@@ -68,7 +68,7 @@ export function SleepStagesChart({ stages }: Props) {
           <li key={s.stage}>
             <span
               className="swatch"
-              style={{ background: COLORS[s.stage] ?? "#8A8A8A" }}
+              style={{ background: COLORS[s.stage] ?? MUTED_SOFT }}
             />
             {s.stage}
             <em>{s.hours.toFixed(1)}h</em>

@@ -22,19 +22,19 @@ export function ScoreMeters({
         label="Day strain"
         display={strain == null ? "—" : `${strain.toFixed(1)} / ${strainMax}`}
         fill={strain == null ? 0 : Math.max(0, Math.min(1, strain / strainMax))}
-        tone="white"
+        tone="soft"
       />
       <Meter
         label="Sleep yield"
         display={yieldPct == null ? "—" : `${Math.round(yieldPct)}%`}
         fill={yieldPct == null ? 0 : Math.max(0, Math.min(1, yieldPct / 100))}
-        tone="amber"
+        tone="ink"
       />
       <Meter
         label="Resting HR"
         display={rhr == null ? "—" : `${Math.round(rhr)} bpm`}
         fill={rhr == null ? 0 : Math.max(0, Math.min(1, (80 - rhr) / 40))}
-        tone="white"
+        tone="soft"
       />
     </div>
   );
@@ -114,7 +114,7 @@ function Meter({
   label: string;
   display: string;
   fill: number;
-  tone: "white" | "amber";
+  tone: "soft" | "ink";
 }) {
   return (
     <div className="score-meter">
