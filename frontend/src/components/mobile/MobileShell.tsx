@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { MobileTab } from "../../types";
+import { WhoopConnectionPanel } from "../WhoopConnectionPanel";
 import { BottomNav } from "./BottomNav";
 
 const MOBILE_QUERY = "(max-width: 959px)";
@@ -29,6 +30,9 @@ interface Props {
   syncError?: string | null;
   onRetry?: () => void;
   syncing?: boolean;
+  /** Ground truth behind syncError; see WhoopConnectionPanel. */
+  whoopConnected?: boolean | null;
+  isAdmin?: boolean;
 }
 
 export function MobileShell({
@@ -40,6 +44,8 @@ export function MobileShell({
   syncError,
   onRetry,
   syncing = false,
+  whoopConnected = null,
+  isAdmin = false,
 }: Props) {
   const hasOverlay = overlay != null;
 
@@ -52,12 +58,13 @@ export function MobileShell({
       <div className="mobile-body">
         {syncError ? (
           <div className="mobile-sync-error" role="alert">
-            <p>{syncError}</p>
-            {onRetry ? (
-              <button type="button" className="btn" disabled={syncing} onClick={onRetry}>
-                {syncing ? "Syncing…" : "Try again"}
-              </button>
-            ) : null}
+            <WhoopConnectionPanel
+              connected={whoopConnected}
+              isAdmin={isAdmin}
+              syncing={syncing}
+              detail={syncError}
+              onCheckAgain={() => onRetry?.()}
+            />
           </div>
         ) : null}
         {overlay ?? children}

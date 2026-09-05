@@ -265,6 +265,13 @@ code {
   background: var(--amber);
   color: var(--on-primary);
   transition: opacity 0.15s ease;
+  /* A <button>'s UA default already renders this way; stated explicitly so
+     an <a className="btn"> (the WHOOP connect link, a top-level navigation
+     rather than a click handler) gets the same box instead of an inline
+     element's stretched-looking padding. */
+  display: inline-block;
+  text-decoration: none;
+  text-align: center;
 }
 
 .btn:hover {

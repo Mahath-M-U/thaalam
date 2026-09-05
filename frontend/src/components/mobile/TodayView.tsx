@@ -5,6 +5,7 @@ import { Sparkline } from "../ReadsTable";
 import { RunwayCard } from "../RunwayCard";
 import { ScoreMeters } from "../ScoreRingCard";
 import { ScoreRing, VitalityDeepDive } from "../VitalityDeepDive";
+import { WhoopConnectionPanel } from "../WhoopConnectionPanel";
 
 const SIGNAL_IDS = [
   "restorative_yield",
@@ -24,6 +25,9 @@ interface Props {
   onRefresh: () => void;
   syncing: boolean;
   syncError?: string | null;
+  /** Ground truth behind syncError; see WhoopConnectionPanel. */
+  whoopConnected?: boolean | null;
+  isAdmin?: boolean;
   onVitalityOpenChange?: (open: boolean) => void;
 }
 
@@ -38,6 +42,8 @@ export function TodayView({
   onRefresh,
   syncing,
   syncError,
+  whoopConnected = null,
+  isAdmin = false,
   onVitalityOpenChange,
 }: Props) {
   const [vitalityOpen, setVitalityOpen] = useState(false);
@@ -96,18 +102,34 @@ export function TodayView({
           </button>
           {settingsOpen ? (
             <div className="today-settings-menu" id="today-settings-menu" role="menu">
-              {syncError ? <p className="today-settings-error">{syncError}</p> : null}
-              <button
-                type="button"
-                role="menuitem"
-                disabled={syncing}
-                onClick={() => {
-                  setSettingsOpen(false);
-                  onRefresh();
-                }}
-              >
-                {syncing ? "Syncing…" : syncError ? "Try again" : "Refresh data"}
-              </button>
+              {/* Sync is admin-only server-side; don't offer a viewer a 403
+                  (matches the desktop sidebar's refresh control). */}
+              {!isAdmin ? null : syncError ? (
+                <div className="today-settings-error">
+                  <WhoopConnectionPanel
+                    connected={whoopConnected}
+                    isAdmin={isAdmin}
+                    syncing={syncing}
+                    detail={syncError}
+                    onCheckAgain={() => {
+                      setSettingsOpen(false);
+                      onRefresh();
+                    }}
+                  />
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={syncing}
+                  onClick={() => {
+                    setSettingsOpen(false);
+                    onRefresh();
+                  }}
+                >
+                  {syncing ? "Syncing…" : "Refresh data"}
+                </button>
+              )}
             </div>
           ) : null}
         </div>
