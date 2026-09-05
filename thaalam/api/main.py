@@ -12,19 +12,30 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
+import logging
 
-from thaalam.api.middleware import RequestContextMiddleware
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+
+from thaalam.api.middleware import (
+    REQUEST_ID_HEADER,
+    RateLimitMiddleware,
+    RequestContextMiddleware,
+    RequestSizeLimitMiddleware,
+    SecurityHeadersMiddleware,
+)
 from thaalam.api.routes import auth, briefs, data, derived, health, oauth, webhooks
 from thaalam.config import get_settings
-from thaalam.logging_config import setup_logging
+from thaalam.logging_config import request_id_var, setup_logging
 
 settings = get_settings()
 settings.validate_runtime()
 setup_logging()
+
+logger = logging.getLogger(__name__)
 
 # The schema names every route and its shape. Useful in dev, needless
 # reconnaissance for an unauthenticated caller in production.
@@ -49,9 +60,34 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RequestSizeLimitMiddleware)
+app.add_middleware(RateLimitMiddleware)
+
+if settings.trusted_hosts:
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.trusted_hosts)
+
 # Added last so it wraps everything else and every request gets logged once,
-# with a correlation id, whatever the inner layers do.
+# with a correlation id, whatever the inner layers do -- including requests
+# the rate limiter or size cap rejects before they reach a route.
 app.add_middleware(RequestContextMiddleware)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Return the request id and nothing else.
+
+    An unhandled error's message can carry a file path, a query, or a
+    connection string. The detail goes to the log, where the same id makes it
+    findable; the caller gets only the id.
+    """
+    request_id = request_id_var.get()
+    logger.exception("Unhandled error", extra={"request_id": request_id})
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error", "request_id": request_id},
+        headers={REQUEST_ID_HEADER: request_id} if request_id else None,
+    )
 
 app.include_router(health.router)
 app.include_router(auth.router)

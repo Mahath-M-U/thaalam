@@ -104,6 +104,18 @@ class Settings(BaseSettings):
     login_max_attempts: int = 5
     auth_db_path: str = ""
 
+    # Request limits. The rate limiter counts in-process, which is correct
+    # only because the app runs a single worker (DuckDB allows one writer).
+    rate_limit_requests: int = 240
+    rate_limit_window_seconds: int = 60
+    max_request_bytes: int = 1_048_576
+    allowed_hosts: str = ""
+
+    @property
+    def trusted_hosts(self) -> list[str]:
+        """Host allow-list, or empty to accept any Host header."""
+        return [h.strip() for h in self.allowed_hosts.split(",") if h.strip()]
+
     @property
     def is_production(self) -> bool:
         return self.app_env.strip().lower() in NON_DEV_ENV_NAMES
