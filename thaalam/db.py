@@ -17,9 +17,13 @@ from typing import Any
 
 import duckdb
 
+from thaalam.config import get_settings
+
 logger = logging.getLogger(__name__)
 
-DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent / "data" / "whoop.duckdb"
+#: Honours DATA_DIR so an installed package writes to its mounted volume
+#: rather than into site-packages.
+DEFAULT_DB_PATH = get_settings().resolved_db_path
 
 _SCHEMA_STATEMENTS = [
     """

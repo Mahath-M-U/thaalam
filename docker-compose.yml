@@ -24,6 +24,8 @@ services:
     environment:
       APP_ENV: ${APP_ENV:-production}
       PORT: "8000"
+      # Must point at the mounted volume; see the Dockerfile for why.
+      DATA_DIR: /app/data
       # Passed through from Dokploy environment if set; blank is fine locally.
       CLIENT_ID: ${CLIENT_ID:-}
       CLIENT_SECRET: ${CLIENT_SECRET:-}
@@ -32,7 +34,16 @@ services:
       WHOOP_TOKEN_KEY_FILE: ${WHOOP_TOKEN_KEY_FILE:-}
       FRONTEND_URL: ${FRONTEND_URL:-}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-}
       COOKIE_SECURE: ${COOKIE_SECURE:-}
+      SESSION_TTL_MINUTES: ${SESSION_TTL_MINUTES:-720}
+      LOGIN_MAX_ATTEMPTS: ${LOGIN_MAX_ATTEMPTS:-5}
+      RATE_LIMIT_REQUESTS: ${RATE_LIMIT_REQUESTS:-240}
+      NIGHTLY_JOB_ENABLED: ${NIGHTLY_JOB_ENABLED:-true}
+      NIGHTLY_JOB_HOUR: ${NIGHTLY_JOB_HOUR:-4}
+      # Only the reverse proxy can reach this port, so trusting its
+      # X-Forwarded-For is what makes throttling see real client addresses.
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-*}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     volumes:
       - thaalam_data:/app/data

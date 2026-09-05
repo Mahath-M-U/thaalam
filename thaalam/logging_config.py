@@ -28,7 +28,7 @@ from pathlib import Path
 
 from thaalam.config import get_settings
 
-DEFAULT_LOG_PATH = Path(__file__).resolve().parent.parent / "data" / "thaalam.log"
+DEFAULT_LOG_PATH = get_settings().resolved_log_path
 
 _LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 _DATE_FORMAT = "%Y-%m-%d %H:%M:%S"

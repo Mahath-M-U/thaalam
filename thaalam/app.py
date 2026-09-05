@@ -27,9 +27,9 @@ authorization_url = _settings.authorization_url or AUTHORIZE_URL
 token_url = _settings.token_url or TOKEN_URL
 revoke_url = _settings.revoke_url or REVOKE_URL
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
-TOKEN_PATH = DATA_DIR / "whoop_token.json"
-DB_PATH = DATA_DIR / "whoop.duckdb"
+DATA_DIR = _settings.resolved_data_dir
+TOKEN_PATH = _settings.resolved_token_path
+DB_PATH = _settings.resolved_db_path
 
 
 def _authenticate(client: WhoopClient) -> None:

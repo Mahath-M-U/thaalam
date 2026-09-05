@@ -201,10 +201,16 @@ HSTS assume HTTPS, and `run_api.py` enables `--proxy-headers` in production so
 the real client address reaches the throttler and the access log instead of the
 proxy's.
 
-**Back up `data/`** — it holds `whoop.duckdb` (health history), the encrypted
-WHOOP token, and `thaalam_auth.db` (accounts and audit trail). Back the auth
-database up separately if you want to rotate it independently. Logs rotate at
-5 MB × 3 files.
+**Set `DATA_DIR` to a persistent path.** It holds `whoop.duckdb` (health
+history), the encrypted WHOOP token, `thaalam_auth.db` (accounts and audit
+trail), and the logs. Left unset, it resolves next to the installed package —
+correct for a source checkout, but inside `site-packages` for a container
+install, where a redeploy would discard all of it. The app refuses to start in
+production if it resolves there. The Docker image sets `DATA_DIR=/app/data`
+and mounts it as a volume.
+
+**Back that directory up.** Back the auth database up separately if you want to
+rotate it independently. Logs rotate at 5 MB × 3 files.
 
 The nightly recompute runs in-process at `NIGHTLY_JOB_HOUR` (04:00 by default).
 Set `NIGHTLY_JOB_ENABLED=false` and drive `python -m thaalam.services.nightly_job`

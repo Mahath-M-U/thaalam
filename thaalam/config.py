@@ -25,9 +25,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # modules that still read os.getenv directly keep working unchanged.
 load_dotenv()
 
-#: Kept in step with `thaalam.db.DEFAULT_DB_PATH`'s parent. Duplicated rather
-#: than imported so config stays free of the DuckDB import chain.
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+#: Where data lands when DATA_DIR is unset: alongside the repo checkout.
+#:
+#: This default is derived from the package location, which is right for a
+#: source checkout and wrong for an installed package -- in a container
+#: `pip install .` puts the package under site-packages, so an unset DATA_DIR
+#: would write the database, token and logs there instead of the mounted
+#: volume, and every redeploy would take the data with it. Deployments must
+#: set DATA_DIR explicitly.
+DEFAULT_DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
 #: Checked in order; the first non-empty one wins. `APP_ENV` is canonical,
 #: the other two are the names the app shipped with.
@@ -104,6 +110,10 @@ class Settings(BaseSettings):
     login_max_attempts: int = 5
     auth_db_path: str = ""
 
+    #: Everything that must survive a redeploy: the DuckDB file, the encrypted
+    #: WHOOP token, the auth database, and the logs.
+    data_dir: str = ""
+
     # Request limits. The rate limiter counts in-process, which is correct
     # only because the app runs a single worker (DuckDB allows one writer).
     rate_limit_requests: int = 240
@@ -146,6 +156,24 @@ class Settings(BaseSettings):
         return self.cookie_secure
 
     @property
+    def resolved_data_dir(self) -> Path:
+        if self.data_dir.strip():
+            return Path(self.data_dir).expanduser()
+        return DEFAULT_DATA_DIR
+
+    @property
+    def resolved_db_path(self) -> Path:
+        return self.resolved_data_dir / "whoop.duckdb"
+
+    @property
+    def resolved_log_path(self) -> Path:
+        return self.resolved_data_dir / "thaalam.log"
+
+    @property
+    def resolved_token_path(self) -> Path:
+        return self.resolved_data_dir / "whoop_token.json"
+
+    @property
     def resolved_auth_db_path(self) -> Path:
         """Auth database path -- deliberately a separate file from the DuckDB.
 
@@ -154,7 +182,7 @@ class Settings(BaseSettings):
         """
         if self.auth_db_path.strip():
             return Path(self.auth_db_path).expanduser()
-        return DATA_DIR / "thaalam_auth.db"
+        return self.resolved_data_dir / "thaalam_auth.db"
 
     def validate_runtime(self) -> None:
         """Refuse to start with development-grade settings in production.
@@ -177,6 +205,16 @@ class Settings(BaseSettings):
             problems.append(
                 "WHOOP_TOKEN_KEY must be set -- refusing to mint a key file "
                 "alongside the encrypted token"
+            )
+        # An installed package puts the default data directory inside
+        # site-packages, which no sane deployment mounts as a volume: the
+        # database, token and accounts would be silently discarded on the next
+        # redeploy. Better to refuse to start than to lose the data later.
+        if "site-packages" in self.resolved_data_dir.parts:
+            problems.append(
+                f"DATA_DIR must be set to a persistent path -- it currently "
+                f"resolves inside the installed package "
+                f"({self.resolved_data_dir}), which a redeploy would discard"
             )
         if problems:
             raise RuntimeError(
