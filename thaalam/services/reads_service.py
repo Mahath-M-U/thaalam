@@ -455,7 +455,7 @@ def _stage_dependency(nights: list[dict[str, Any]]) -> tuple[dict[str, Any], dic
     pct = variance[0]["pct"] or 0
     finding = f"your recovery tracks {dominant} · {pct:.0f}% of the stage–HRV link on your last {STAGE_WINDOW} nights"
     meaning = (
-        f"Population guidance calls deep sleep physical and REM cognitive. Your recovery tracks "
+        f"Deep sleep is often treated as physical and REM as cognitive. Your recovery tracks "
         f"{dominant} most strongly on your own nights — so the habits that feed {dominant} "
         f"matter more for you than chasing a stage that does not move your HRV."
     )
@@ -499,8 +499,7 @@ def _hyperarousal(nights: list[dict[str, Any]]) -> tuple[dict[str, Any], dict[st
     methodology = (
         "A night is flagged when sleep-debt hours and in-bed awake minutes both sit above "
         f"your own {HYPER_PERCENTILE:.0f}th percentile. WHOOP v2 does not expose sleep-onset "
-        "latency; awake time in bed is the latency stand-in. Measured against your own nights, "
-        "not a population cut."
+        "latency; awake time in bed is the latency stand-in. Measured against your own nights."
     )
     points = []
     for night in nights:
@@ -816,7 +815,7 @@ def _strain_sensitivity(nights: list[dict[str, Any]]) -> tuple[dict[str, Any], d
     }
     meaning = (
         "Each extra strain unit on the day before is associated with this change in next-morning "
-        f"HRV, fitted on your last {SLOPE_WINDOW} scored days — not a population slope."
+        f"HRV, fitted on your last {SLOPE_WINDOW} scored days."
     )
     read = _row(
         id="strain_sensitivity",

@@ -62,8 +62,9 @@ def recompute(
 ) -> dict[str, Any]:
     """Recompute derived metrics from stored WHOOP rows and persist them.
 
-    Baseline means/counts are filled in here. Band/regression slots are
-    placeholders for later PRs -- we do not invent values for them.
+    Baselines, Vitality Score, eleven reads, and runway are stored from
+    real WHOOP rows. Empty and calibrating states stay empty — no dummy
+    or synthetic points.
     """
     now = _naive_utc(now)
     resolved_user_id = user_id if user_id is not None else _profile_user_id(con)
