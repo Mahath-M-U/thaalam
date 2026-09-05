@@ -97,7 +97,7 @@ def oauth_callback(
     the request may not carry the app's cookie. The single-use `state` written
     by the admin-only /connect is what authorises it.
     """
-    frontend = get_settings().frontend_url or "http://localhost:3001"
+    frontend = _frontend_base(request)
     if error:
         return RedirectResponse(f"{frontend}/?whoop=error", status_code=302)
     if not code:
@@ -129,6 +129,25 @@ def oauth_callback(
     )
     background_tasks.add_task(_run_oauth_backfill)
     return RedirectResponse(f"{frontend}/?whoop=connected", status_code=302)
+
+
+def _frontend_base(request: Request) -> str:
+    """The origin to send the browser back to once WHOOP has redirected here.
+
+    `FRONTEND_URL` when it is set, otherwise the origin this request arrived
+    on. The old fallback was a literal http://localhost:3001, which is correct
+    on a laptop running Vite and useless anywhere else: a deployment that had
+    not set FRONTEND_URL would complete the token exchange and then redirect
+    the user to a port on their own machine. Production serves the built
+    frontend from this very origin, so the request is the right source for it.
+
+    `run_api.py` enables proxy headers in production, so `base_url` reflects
+    the public https:// domain rather than the container's address.
+    """
+    configured = get_settings().resolved_frontend_url
+    if configured:
+        return configured
+    return str(request.base_url).rstrip("/")
 
 
 def _run_oauth_backfill() -> None:

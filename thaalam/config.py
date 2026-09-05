@@ -44,8 +44,14 @@ NON_DEV_ENV_NAMES = frozenset({"prod", "production", "staging"})
 
 _TRUTHY = frozenset({"1", "true", "yes", "on"})
 
+#: Where the Vite dev server runs. Only ever used when APP_ENV is not
+#: production: a deployed app serves the built frontend from its own origin,
+#: and sending a deployed user here would land them on a port that exists
+#: only on the developer's machine.
+DEV_FRONTEND_URL = "http://localhost:3001"
+
 DEV_CORS_ORIGINS = (
-    "http://localhost:3001",
+    DEV_FRONTEND_URL,
     "http://127.0.0.1:3001",
     "http://localhost:3002",
     "http://127.0.0.1:3002",
@@ -116,8 +122,8 @@ class Settings(BaseSettings):
     whoop_token_key_file: str = ""
     whoop_require_token_key: bool = False
 
-    # Web surface.
-    frontend_url: str = "http://localhost:3001"
+    # Web surface. Empty is meaningful; see resolved_frontend_url.
+    frontend_url: str = ""
     allowed_origins: str = ""
     log_level: str = "INFO"
 
@@ -173,6 +179,22 @@ class Settings(BaseSettings):
         if configured:
             return configured
         return [] if self.is_production else list(DEV_CORS_ORIGINS)
+
+    @property
+    def resolved_frontend_url(self) -> str:
+        """Where to send a browser that finishes an OAuth round-trip.
+
+        `FRONTEND_URL` wins wherever it is set. Left unset, development falls
+        back to the Vite dev server, because dev really does run the frontend
+        on a second origin. Production returns "" instead, which the caller
+        reads as "use the origin this request arrived on" -- the packaged app
+        serves the built frontend from that same origin, so it is always
+        right, and it cannot strand a deployed user on http://localhost:3001.
+        """
+        configured = self.frontend_url.strip().rstrip("/")
+        if configured:
+            return configured
+        return "" if self.is_production else DEV_FRONTEND_URL
 
     @property
     def secure_cookies(self) -> bool:

@@ -208,7 +208,7 @@ committed:
 | `WHOOP_TOKEN_KEY` | 32 random bytes — generate once, then **keep it** |
 | `CLIENT_ID` / `CLIENT_SECRET` | from the WHOOP developer dashboard |
 | `REDIRECT_URI` | `https://your-domain/api/oauth/whoop/callback` |
-| `FRONTEND_URL` | `https://your-domain` |
+| `FRONTEND_URL` | `https://your-domain` — optional; see below |
 
 ```bash
 python -c "import os,base64; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"
@@ -222,6 +222,13 @@ Changing it later means reconnecting WHOOP.
 `DATA_DIR` is already set to `/app/data` by the image, and `REDIRECT_URI` must
 match a URI registered in the WHOOP dashboard exactly. Once it boots, open
 `/register` to claim the owner account.
+
+`FRONTEND_URL` is where the WHOOP callback sends the browser after the token
+exchange. Leave it unset and the callback uses the origin the request arrived
+on, which is already the domain serving the app — so it is right by default and
+cannot strand a user on `http://localhost:3001`. Set it only when the frontend
+is hosted somewhere other than the API, and never leave a localhost value in a
+deployment.
 
 **Point the proxy at port 8001.** The container listens on `PORT` (8001 by
 default) and serves the API and the built frontend from that one port, so the

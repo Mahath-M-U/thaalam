@@ -6,6 +6,7 @@ import pytest
 
 from thaalam.config import (
     DEV_CORS_ORIGINS,
+    DEV_FRONTEND_URL,
     Settings,
     is_non_dev,
     reset_settings_cache,
@@ -25,6 +26,7 @@ def _clear_env(monkeypatch):
         "ALLOWED_ORIGINS",
         "COOKIE_SECURE",
         "AUTH_DB_PATH",
+        "FRONTEND_URL",
     ):
         monkeypatch.delenv(name, raising=False)
     reset_settings_cache()
@@ -134,3 +136,32 @@ def test_auth_db_path_override(monkeypatch, tmp_path):
     target = tmp_path / "custom_auth.db"
     monkeypatch.setenv("AUTH_DB_PATH", str(target))
     assert Settings().resolved_auth_db_path == target
+
+
+# ---------------------------------------------------------------------------
+# Where a finished OAuth round-trip sends the browser
+# ---------------------------------------------------------------------------
+
+
+def test_frontend_url_falls_back_to_the_dev_server_in_development():
+    """Dev genuinely runs the frontend on a second origin."""
+    assert Settings().resolved_frontend_url == DEV_FRONTEND_URL
+
+
+def test_frontend_url_is_empty_in_production_when_unset(monkeypatch):
+    """Never http://localhost:3001 -- that port exists only on a laptop.
+
+    Empty means "use the origin the request arrived on", which is right
+    because production serves the built frontend from that same origin.
+    """
+    monkeypatch.setenv("APP_ENV", "production")
+    assert Settings().resolved_frontend_url == ""
+
+
+@pytest.mark.parametrize("app_env", ["development", "production"])
+def test_configured_frontend_url_wins_and_loses_its_trailing_slash(
+    monkeypatch, app_env
+):
+    monkeypatch.setenv("APP_ENV", app_env)
+    monkeypatch.setenv("FRONTEND_URL", "https://thaalam.example/")
+    assert Settings().resolved_frontend_url == "https://thaalam.example"
