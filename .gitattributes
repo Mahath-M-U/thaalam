@@ -1,0 +1,10 @@
+# Files that run inside a Linux container must keep LF endings in the working
+# tree, not just in the repository. Docker builds from the working tree, and
+# with core.autocrlf=true on Windows a shell script gets checked out with CRLF
+# — which fails at runtime with "bad interpreter: /bin/sh^M".
+*.sh text eol=lf
+docker-entrypoint.sh text eol=lf
+Dockerfile text eol=lf
+docker-compose.yml text eol=lf
+.dockerignore text eol=lf
+.env.example text eol=lf

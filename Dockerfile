@@ -62,6 +62,10 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN useradd --create-home --uid 10001 thaalam \
     && mkdir -p /app/data \
     && chown -R thaalam:thaalam /app \
+    # Belt and braces against CRLF: .gitattributes pins LF, but a checkout on
+    # a Windows host that ignored it would produce "/bin/sh^M: bad
+    # interpreter", which is miserable to diagnose from a deploy log.
+    && sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh \
     && chmod +x /usr/local/bin/docker-entrypoint.sh
 
 VOLUME ["/app/data"]
