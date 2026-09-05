@@ -12,6 +12,8 @@ Schema is applied on every connect, matching the additive
 
 from __future__ import annotations
 
+import hashlib
+import secrets
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -80,7 +82,24 @@ _SCHEMA_STATEMENTS = (
     )
     """,
     "CREATE INDEX IF NOT EXISTS idx_login_attempts_created ON login_attempts(created_at DESC)",
+    """
+    CREATE TABLE IF NOT EXISTS invites (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        token_hash       TEXT NOT NULL UNIQUE,
+        email            TEXT,
+        role             TEXT NOT NULL CHECK (role IN ('admin', 'viewer')),
+        created_by       INTEGER REFERENCES users(id),
+        created_at       TEXT NOT NULL,
+        expires_at       TEXT NOT NULL,
+        accepted_at      TEXT,
+        accepted_user_id INTEGER,
+        revoked_at       TEXT
+    )
+    """,
 )
+
+#: How long an unused invite stays valid.
+INVITE_TTL_HOURS = 168
 
 
 def utcnow() -> datetime:
@@ -330,3 +349,86 @@ def purge_login_attempts(con: sqlite3.Connection, *, older_than_minutes: int = 1
     cutoff = to_iso(utcnow() - timedelta(minutes=older_than_minutes))
     con.execute("DELETE FROM login_attempts WHERE created_at < ?", (cutoff,))
     con.commit()
+
+
+# ---------------------------------------------------------------------------
+# Invites
+# ---------------------------------------------------------------------------
+
+
+def hash_invite_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def create_invite(
+    con: sqlite3.Connection,
+    *,
+    role: str,
+    created_by: int | None,
+    email: str | None = None,
+    ttl_hours: int = INVITE_TTL_HOURS,
+) -> tuple[int, str]:
+    """Mint a single-use invite. Returns (id, token); only the hash is stored."""
+    if role not in ROLES:
+        raise ValueError(f"role must be one of {ROLES}, got {role!r}")
+    token = secrets.token_urlsafe(32)
+    now = utcnow()
+    cursor = con.execute(
+        """
+        INSERT INTO invites (token_hash, email, role, created_by, created_at, expires_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            hash_invite_token(token),
+            normalise_email(email) if email else None,
+            role,
+            created_by,
+            to_iso(now),
+            to_iso(now + timedelta(hours=ttl_hours)),
+        ),
+    )
+    con.commit()
+    return int(cursor.lastrowid), token
+
+
+def get_usable_invite(con: sqlite3.Connection, token: str) -> sqlite3.Row | None:
+    """An invite that may still be redeemed, or None."""
+    if not token:
+        return None
+    row = con.execute(
+        "SELECT * FROM invites WHERE token_hash = ?", (hash_invite_token(token),)
+    ).fetchone()
+    if row is None:
+        return None
+    if row["accepted_at"] is not None or row["revoked_at"] is not None:
+        return None
+    if from_iso(row["expires_at"]) <= utcnow():
+        return None
+    return row
+
+
+def accept_invite(con: sqlite3.Connection, invite_id: int, user_id: int) -> None:
+    con.execute(
+        "UPDATE invites SET accepted_at = ?, accepted_user_id = ? WHERE id = ?",
+        (to_iso(utcnow()), user_id, invite_id),
+    )
+    con.commit()
+
+
+def revoke_invite(con: sqlite3.Connection, invite_id: int) -> None:
+    con.execute(
+        "UPDATE invites SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL",
+        (to_iso(utcnow()), invite_id),
+    )
+    con.commit()
+
+
+def list_invites(con: sqlite3.Connection) -> list[sqlite3.Row]:
+    """Invite metadata. Never returns token hashes."""
+    return con.execute(
+        """
+        SELECT id, email, role, created_at, expires_at, accepted_at, revoked_at
+        FROM invites
+        ORDER BY id DESC
+        """
+    ).fetchall()

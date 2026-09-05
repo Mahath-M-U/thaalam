@@ -5,6 +5,7 @@ import App from "./App";
 import { AuthProvider, useAuth } from "./auth/AuthContext";
 import ChangePasswordView from "./components/auth/ChangePasswordView";
 import LoginView from "./components/auth/LoginView";
+import RegisterView from "./components/auth/RegisterView";
 import { PATHS } from "./routes";
 import "./styles.css";
 
@@ -77,6 +78,14 @@ createRoot(root).render(
             element={
               <RedirectIfSignedIn>
                 <LoginView />
+              </RedirectIfSignedIn>
+            }
+          />
+          <Route
+            path={PATHS.register}
+            element={
+              <RedirectIfSignedIn>
+                <RegisterView />
               </RedirectIfSignedIn>
             }
           />

@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import logging
 import sqlite3
+from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, EmailStr, Field
 
 from thaalam.api.deps import client_ip, get_auth_db, get_current_user
@@ -32,6 +33,12 @@ _BAD_CREDENTIALS = "Incorrect email or password"
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=1, max_length=passwords.MAX_PASSWORD_LENGTH)
+
+
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=1, max_length=passwords.MAX_PASSWORD_LENGTH)
+    invite_token: str | None = Field(default=None, max_length=256)
 
 
 class PasswordChangeRequest(BaseModel):
@@ -82,6 +89,118 @@ def _set_session_cookies(response: Response, token: str, csrf_token: str) -> Non
 def _clear_session_cookies(response: Response) -> None:
     for name in (session_store.SESSION_COOKIE, session_store.CSRF_COOKIE):
         response.delete_cookie(name, path="/")
+
+
+@router.get("/registration")
+def registration_status(
+    invite: str | None = Query(default=None, max_length=256),
+    con: sqlite3.Connection = Depends(get_auth_db),
+) -> dict[str, Any]:
+    """What, if anything, /register will accept right now.
+
+    Reveals only whether the instance has been set up yet and whether a given
+    token is redeemable -- never who holds accounts, and never a token.
+    """
+    first_run = auth_store.count_users(con) == 0
+    return {
+        "first_run": first_run,
+        "invite_required": not first_run,
+        "invite_valid": bool(invite) and auth_store.get_usable_invite(con, invite) is not None,
+    }
+
+
+@router.post("/register", response_model=UserResponse, status_code=201)
+def register(
+    payload: RegisterRequest,
+    request: Request,
+    response: Response,
+    con: sqlite3.Connection = Depends(get_auth_db),
+) -> UserResponse:
+    """Create an account, in exactly two situations.
+
+    Before any account exists, the first visitor claims the owner account --
+    the window closes permanently once it is taken. After that, an unused
+    invite from an administrator is required. There is no open signup: a
+    viewer here reads the owner's health data, so anyone who could register
+    freely could read it.
+    """
+    ip = client_ip(request)
+    settings = get_settings()
+    first_run = auth_store.count_users(con) == 0
+
+    invite = None
+    if first_run:
+        role = auth_store.ROLE_ADMIN
+    else:
+        invite = auth_store.get_usable_invite(con, payload.invite_token or "")
+        if invite is None:
+            auth_store.record_audit(
+                con,
+                "register.rejected",
+                actor_email=payload.email,
+                client_ip=ip,
+                request_id=request_id_var.get(),
+                detail="missing, spent, revoked or expired invite",
+            )
+            logger.warning("Registration refused: no usable invite", extra={"client_ip": ip})
+            raise HTTPException(
+                status_code=403, detail="Registration is by invitation only"
+            )
+        if invite["email"] and invite["email"] != auth_store.normalise_email(payload.email):
+            raise HTTPException(
+                status_code=403, detail="This invitation is for a different email address"
+            )
+        role = invite["role"]
+
+    if auth_store.get_user_by_email(con, payload.email) is not None:
+        raise HTTPException(status_code=409, detail="An account with that email exists")
+
+    try:
+        password_hash = passwords.hash_password(payload.password)
+    except passwords.WeakPasswordError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    # They chose this password themselves, so there is nothing to rotate.
+    user_id = auth_store.create_user(
+        con,
+        email=payload.email,
+        password_hash=password_hash,
+        role=role,
+        must_change_password=False,
+    )
+    if invite is not None:
+        auth_store.accept_invite(con, invite["id"], user_id)
+
+    auth_store.record_audit(
+        con,
+        "register.succeeded",
+        user_id=user_id,
+        actor_email=payload.email,
+        client_ip=ip,
+        request_id=request_id_var.get(),
+        detail=f"role={role}, {'first run' if first_run else 'invited'}",
+    )
+    logger.info(
+        "Account registered (%s)", "first run" if first_run else "invited",
+        extra={"user": payload.email, "client_ip": ip},
+    )
+
+    token, csrf_token = session_store.create_session(
+        con,
+        user_id=user_id,
+        ttl_minutes=settings.session_ttl_minutes,
+        client_ip=ip,
+        user_agent=request.headers.get("user-agent"),
+    )
+    auth_store.record_login(con, user_id)
+    _set_session_cookies(response, token, csrf_token)
+
+    return UserResponse(
+        email=auth_store.normalise_email(payload.email),
+        role=role,
+        must_change_password=False,
+        csrf_token=csrf_token,
+    )
 
 
 @router.post("/login", response_model=UserResponse)

@@ -92,6 +92,30 @@ export interface CurrentUser {
   csrf_token: string;
 }
 
+export interface RegistrationStatus {
+  first_run: boolean;
+  invite_required: boolean;
+  invite_valid: boolean;
+}
+
+export interface AdminInvite {
+  id: number;
+  email: string | null;
+  role: "admin" | "viewer";
+  created_at: string;
+  expires_at: string;
+  accepted_at: string | null;
+  revoked_at: string | null;
+}
+
+export interface CreatedInvite {
+  id: number;
+  token: string;
+  role: "admin" | "viewer";
+  email: string | null;
+  expires_in_hours: number;
+}
+
 export interface AdminUser {
   id: number;
   email: string;
@@ -191,6 +215,30 @@ export const api = {
       `/api/admin/audit?limit=${limit}${event ? `&event=${encodeURIComponent(event)}` : ""}`,
     ),
   adminSystem: () => requestJson<AdminSystem>("/api/admin/system"),
+
+  registrationStatus: (invite?: string) =>
+    requestJson<RegistrationStatus>(
+      `/api/auth/registration${invite ? `?invite=${encodeURIComponent(invite)}` : ""}`,
+    ),
+  register: (email: string, password: string, inviteToken?: string) =>
+    requestJson<CurrentUser>("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email,
+        password,
+        invite_token: inviteToken || null,
+      }),
+    }),
+  adminInvites: () => requestJson<AdminInvite[]>("/api/admin/invites"),
+  adminCreateInvite: (role: AdminUser["role"], email?: string) =>
+    requestJson<CreatedInvite>("/api/admin/invites", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role, email: email || null }),
+    }),
+  adminRevokeInvite: (id: number) =>
+    requestJson<void>(`/api/admin/invites/${id}`, { method: "DELETE" }),
 
   me: () => requestJson<CurrentUser>("/api/auth/me"),
   login: (email: string, password: string) =>

@@ -1,5 +1,6 @@
-import { useState, type FormEvent } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useState, type FormEvent } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { api } from "../../api";
 import { useAuth } from "../../auth/AuthContext";
 import { PATHS } from "../../routes";
 import AuthShell from "./AuthShell";
@@ -13,6 +14,16 @@ export default function LoginView() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [firstRun, setFirstRun] = useState(false);
+
+  // A fresh deployment has nothing to sign in to yet; point at setup instead
+  // of letting someone guess at credentials that do not exist.
+  useEffect(() => {
+    api
+      .registrationStatus()
+      .then((status) => setFirstRun(status.first_run))
+      .catch(() => setFirstRun(false));
+  }, []);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -72,6 +83,13 @@ export default function LoginView() {
         <button type="submit" className="btn" disabled={busy}>
           {busy ? "Signing in…" : "Sign in"}
         </button>
+
+        {firstRun ? (
+          <p className="auth-alt">
+            No account exists yet.{" "}
+            <Link to={PATHS.register}>Claim this dashboard</Link>
+          </p>
+        ) : null}
       </form>
     </AuthShell>
   );

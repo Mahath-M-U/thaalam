@@ -18,6 +18,8 @@ interface AuthValue {
   signIn: (email: string, password: string) => Promise<CurrentUser>;
   signOut: () => Promise<void>;
   changePassword: (current: string, next: string) => Promise<void>;
+  /** Re-read the session, e.g. after registering signs the visitor in. */
+  refresh: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthValue | null>(null);
@@ -80,6 +82,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(await api.changePassword(current, next));
   }, []);
 
+  const refresh = useCallback(async () => {
+    try {
+      setUser(await api.me());
+      setStatus("signed-in");
+    } catch {
+      setUser(null);
+      setStatus("signed-out");
+    }
+  }, []);
+
   const value = useMemo<AuthValue>(
     () => ({
       status,
@@ -88,8 +100,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signOut,
       changePassword,
+      refresh,
     }),
-    [status, user, signIn, signOut, changePassword],
+    [status, user, signIn, signOut, changePassword, refresh],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -214,6 +214,67 @@ def reset_password(
 
 
 # ---------------------------------------------------------------------------
+# Invites
+# ---------------------------------------------------------------------------
+
+
+class CreateInviteRequest(BaseModel):
+    role: str = Field(pattern="^(admin|viewer)$")
+    email: EmailStr | None = None
+
+
+@router.get("/invites")
+def list_invites(con: sqlite3.Connection = Depends(get_auth_db)) -> list[dict[str, Any]]:
+    """Invite metadata only -- the token itself is shown once, at creation."""
+    return [dict(row) for row in auth_store.list_invites(con)]
+
+
+@router.post("/invites", status_code=201)
+def create_invite(
+    payload: CreateInviteRequest,
+    request: Request,
+    actor: AuthenticatedUser = Depends(require_admin),
+    con: sqlite3.Connection = Depends(get_auth_db),
+) -> dict[str, Any]:
+    """Mint a single-use invite link.
+
+    Only the token's hash is stored, so this response is the one and only
+    time the token exists in readable form.
+    """
+    invite_id, token = auth_store.create_invite(
+        con,
+        role=payload.role,
+        created_by=actor.id,
+        email=payload.email,
+    )
+    _audit(
+        con,
+        request,
+        actor,
+        "invite.created",
+        f"role={payload.role}{f', email={payload.email}' if payload.email else ''}",
+    )
+    return {
+        "id": invite_id,
+        "token": token,
+        "role": payload.role,
+        "email": payload.email,
+        "expires_in_hours": auth_store.INVITE_TTL_HOURS,
+    }
+
+
+@router.delete("/invites/{invite_id}", status_code=204)
+def revoke_invite(
+    invite_id: int,
+    request: Request,
+    actor: AuthenticatedUser = Depends(require_admin),
+    con: sqlite3.Connection = Depends(get_auth_db),
+) -> None:
+    auth_store.revoke_invite(con, invite_id)
+    _audit(con, request, actor, "invite.revoked", f"invite_id={invite_id}")
+
+
+# ---------------------------------------------------------------------------
 # Sessions
 # ---------------------------------------------------------------------------
 

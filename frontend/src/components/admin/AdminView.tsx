@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   api,
   type AdminAuditEntry,
+  type AdminInvite,
   type AdminSession,
   type AdminSystem,
   type AdminUser,
@@ -48,7 +49,12 @@ export function AdminView({ tab, onTab, onClose }: Props) {
         ))}
       </div>
 
-      {tab === "users" ? <UsersPanel /> : null}
+      {tab === "users" ? (
+        <>
+          <UsersPanel />
+          <InvitesPanel />
+        </>
+      ) : null}
       {tab === "sessions" ? <SessionsPanel /> : null}
       {tab === "audit" ? <AuditPanel /> : null}
       {tab === "system" ? <SystemPanel /> : null}
@@ -240,6 +246,116 @@ function UsersPanel() {
       </div>
     </Section>
   );
+}
+
+function InvitesPanel() {
+  const { data, error, loading, refresh } = useResource<AdminInvite[]>(() =>
+    api.adminInvites(),
+  );
+  const [role, setRole] = useState<AdminUser["role"]>("viewer");
+  const [email, setEmail] = useState("");
+  const [link, setLink] = useState("");
+  const [actionError, setActionError] = useState("");
+
+  const mint = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setActionError("");
+    try {
+      const created = await api.adminCreateInvite(role, email || undefined);
+      // The token exists in readable form exactly once -- here.
+      setLink(`${window.location.origin}/register?invite=${encodeURIComponent(created.token)}`);
+      setEmail("");
+      refresh();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Could not create the invite");
+    }
+  };
+
+  return (
+    <Section id="admin-invites" title="Invitations">
+      <div className="chart-card wide">
+        <form className="admin-invite" onSubmit={mint}>
+          <input
+            type="email"
+            placeholder="Bind to an email (optional)"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+          />
+          <select
+            value={role}
+            onChange={(event) => setRole(event.target.value as AdminUser["role"])}
+          >
+            <option value="viewer">Viewer</option>
+            <option value="admin">Admin</option>
+          </select>
+          <button type="submit" className="btn">
+            Create invite link
+          </button>
+        </form>
+
+        {link ? (
+          <p className="admin-handover">
+            Send this link — it works once and is shown only now:
+            <br />
+            <code>{link}</code>
+          </p>
+        ) : null}
+        {actionError ? <p className="auth-error">{actionError}</p> : null}
+
+        <Panel loading={loading} error={error}>
+          {(data ?? []).length === 0 ? (
+            <p className="empty-chart">No invitations yet.</p>
+          ) : (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Created</th>
+                  <th>Role</th>
+                  <th>For</th>
+                  <th>Status</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {(data ?? []).map((invite) => {
+                  const spent =
+                    invite.accepted_at ||
+                    invite.revoked_at ||
+                    new Date(invite.expires_at) < new Date();
+                  return (
+                    <tr key={invite.id}>
+                      <td>{formatWhen(invite.created_at)}</td>
+                      <td>{invite.role}</td>
+                      <td>{invite.email ?? "Anyone with the link"}</td>
+                      <td>{describeInvite(invite)}</td>
+                      <td>
+                        {spent ? null : (
+                          <button
+                            type="button"
+                            className="btn ghost"
+                            onClick={() => void api.adminRevokeInvite(invite.id).then(refresh)}
+                          >
+                            Revoke
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </Panel>
+      </div>
+    </Section>
+  );
+}
+
+function describeInvite(invite: AdminInvite): string {
+  if (invite.accepted_at) return `Used ${formatWhen(invite.accepted_at)}`;
+  if (invite.revoked_at) return "Revoked";
+  if (new Date(invite.expires_at) < new Date()) return "Expired";
+  return `Valid until ${formatWhen(invite.expires_at)}`;
 }
 
 function SessionsPanel() {
