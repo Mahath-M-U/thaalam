@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock
@@ -201,9 +202,15 @@ def test_tampered_token_blob_fails_closed(tmp_path, monkeypatch):
     auth._set_token(auth.token, persist=True)  # type: ignore[arg-type]
     auth.close()
 
-    raw = bytearray(token_path.read_bytes())
-    raw[-6] ^= 0x01
-    token_path.write_bytes(bytes(raw))
+    # Tamper with the decoded bytes, not the base64 text. Flipping a bit in a
+    # base64 character sometimes lands on a non-alphabet one, which decoding
+    # discards rather than rejecting -- so the tamper went undetected for
+    # whichever random nonces produced such a character, and this test failed
+    # intermittently for the wrong reason.
+    prefix, _, payload = token_path.read_bytes().partition(b".")
+    blob = bytearray(base64.urlsafe_b64decode(payload))
+    blob[-6] ^= 0x01
+    token_path.write_bytes(prefix + b"." + base64.urlsafe_b64encode(bytes(blob)))
 
     with pytest.raises(ValueError, match="Token file authentication failed"):
         WhoopAuth("client-id", "client-secret", token_path=token_path, token_key=TEST_KEY)
