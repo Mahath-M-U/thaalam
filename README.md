@@ -223,6 +223,27 @@ Changing it later means reconnecting WHOOP.
 match a URI registered in the WHOOP dashboard exactly. Once it boots, open
 `/register` to claim the owner account.
 
+**Point the proxy at port 8001.** The container listens on `PORT` (8001 by
+default) and serves the API and the built frontend from that one port, so the
+reverse proxy needs that number and no other. On Dokploy this is the *Container
+Port* field under Domains, which defaults to 3000 — leave it and the proxy
+connects to a closed port.
+
+A mismatch here, or an app bound to loopback, produces the same confusing
+symptom: the container reports healthy while the domain returns **502 Bad
+Gateway**. The healthcheck now tests the container's routable address rather
+than localhost, so a container that the proxy cannot reach fails its check
+instead of pretending to be fine.
+
+**Dokploy: Application or Docker Compose, not both.** Deployed as an
+*Application*, Dokploy builds the `Dockerfile` and ignores `docker-compose.yml`
+entirely — every variable in the table above has to come from the Environment
+tab, and the data volume is configured under Advanced rather than by the
+`volumes:` block. Deployed as a *Docker Compose* app, the compose file supplies
+the port, the volume and `APP_ENV`, and the Environment tab supplies only the
+secrets. Container names tell you which one you got: `<name>.1.<task-id>` is a
+swarm task, so an Application.
+
 **Run exactly one worker.** DuckDB allows one writer and the API holds a single
 process-wide writable connection; a second worker would fight it for the file,
 and the in-process rate limiter counts per process. Scaling out means moving off

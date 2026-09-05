@@ -59,7 +59,11 @@ services:
     volumes:
       - thaalam_data:/app/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      # Same blind spot as the Dockerfile's: a loopback check passes while
+      # the proxy gets connection refused, so test the routable address.
+      test:
+        - CMD-SHELL
+        - ip=$$(hostname -i | tr ' ' '\n' | grep -E '^[0-9.]+$$' | head -n1); curl -f "http://$${ip:-localhost}:$${PORT:-8001}/health"
       interval: 30s
       timeout: 5s
       retries: 3

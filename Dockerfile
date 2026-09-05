@@ -76,8 +76,13 @@ VOLUME ["/app/data"]
 # to route and no cross-origin request to allow.
 EXPOSE 8001
 
+# Tests the container's own routable address rather than localhost. An app
+# bound to 127.0.0.1 answers a loopback check perfectly while the reverse
+# proxy cannot reach it at all -- a healthy container serving 502s, which is
+# a miserable thing to diagnose. Falls back to localhost if the container
+# has no IPv4 address to test.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD curl -f http://localhost:${PORT:-8001}/health || exit 1
+    CMD ip=$(hostname -i | tr ' ' '\n' | grep -E '^[0-9.]+$' | head -n1); curl -f "http://${ip:-localhost}:${PORT:-8001}/health" || exit 1
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
