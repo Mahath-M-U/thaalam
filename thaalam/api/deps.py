@@ -2,21 +2,18 @@
 
 from __future__ import annotations
 
-import os
 from collections.abc import Generator
 from pathlib import Path
 from threading import Lock
 
 import duckdb
-from dotenv import load_dotenv
 from fastapi import HTTPException
 
+from thaalam.config import get_settings
 from thaalam.db import DEFAULT_DB_PATH
 from thaalam.db import get_connection as _open_base_connection
 from thaalam.whoop_client.auth import AUTHORIZE_URL, REVOKE_URL, TOKEN_URL, default_token_key_path
 from thaalam.whoop_client.client import WhoopClient
-
-load_dotenv()
 
 DB_PATH = DEFAULT_DB_PATH
 DATA_DIR = Path(DEFAULT_DB_PATH).resolve().parent
@@ -99,14 +96,15 @@ def get_or_create_connection() -> Generator[duckdb.DuckDBPyConnection, None, Non
 
 
 def whoop_credentials() -> dict[str, str]:
+    settings = get_settings()
     return {
-        "client_id": os.getenv("CLIENT_ID") or "",
-        "client_secret": os.getenv("CLIENT_SECRET") or "",
-        "redirect_uri": os.getenv("REDIRECT_URI") or "",
-        "authorize_url": os.getenv("AUTHORIZATION_URL") or AUTHORIZE_URL,
-        "token_url": os.getenv("TOKEN_URL") or TOKEN_URL,
-        "revoke_url": os.getenv("REVOKE_URL") or REVOKE_URL,
-        "token_key": os.getenv("WHOOP_TOKEN_KEY") or "",
+        "client_id": settings.client_id,
+        "client_secret": settings.client_secret,
+        "redirect_uri": settings.redirect_uri,
+        "authorize_url": settings.authorization_url or AUTHORIZE_URL,
+        "token_url": settings.token_url or TOKEN_URL,
+        "revoke_url": settings.revoke_url or REVOKE_URL,
+        "token_key": settings.whoop_token_key,
     }
 
 

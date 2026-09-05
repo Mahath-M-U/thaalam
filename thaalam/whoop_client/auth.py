@@ -30,6 +30,8 @@ from urllib.parse import parse_qs, urlencode, urlparse
 
 import requests
 
+from thaalam.config import is_non_dev as config_is_non_dev
+
 logger = logging.getLogger(__name__)
 
 # Encrypted-at-rest token files start with this prefix so we can still
@@ -243,11 +245,7 @@ def default_token_key_path() -> Path:
 
 
 def _is_non_dev() -> bool:
-    env = (os.getenv("THAALAM_ENV") or os.getenv("ENV") or "").strip().lower()
-    if env in ("prod", "production", "staging"):
-        return True
-    flag = (os.getenv("WHOOP_REQUIRE_TOKEN_KEY") or "").strip().lower()
-    return flag in ("1", "true", "yes")
+    return config_is_non_dev()
 
 
 def _resolve_token_key(

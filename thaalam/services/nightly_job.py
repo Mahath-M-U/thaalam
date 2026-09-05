@@ -53,11 +53,9 @@ def run_nightly_job(
 
 
 if __name__ == "__main__":
-    from dotenv import load_dotenv
-
+    import thaalam.config  # noqa: F401  -- importing loads .env
     from thaalam.logging_config import setup_logging
 
-    load_dotenv()
     setup_logging()
     result = run_nightly_job()
     if result.get("skipped"):

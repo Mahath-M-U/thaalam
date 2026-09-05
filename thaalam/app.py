@@ -7,27 +7,25 @@ on later runs.
 """
 
 import logging
-import os
 import sys
 from pathlib import Path
 
-from dotenv import load_dotenv
-
+from thaalam.config import get_settings
 from thaalam.logging_config import setup_logging
 from thaalam.sync import sync_all_historical_data
 from thaalam.whoop_client.auth import AUTHORIZE_URL, REVOKE_URL, TOKEN_URL
 from thaalam.whoop_client.client import WhoopClient
 
-load_dotenv()
 setup_logging()
 logger = logging.getLogger(__name__)
 
-client_id = os.getenv("CLIENT_ID") or ""
-client_secret = os.getenv("CLIENT_SECRET") or ""
-redirect_uri = os.getenv("REDIRECT_URI") or ""
-authorization_url = os.getenv("AUTHORIZATION_URL") or AUTHORIZE_URL
-token_url = os.getenv("TOKEN_URL") or TOKEN_URL
-revoke_url = os.getenv("REVOKE_URL") or REVOKE_URL
+_settings = get_settings()
+client_id = _settings.client_id
+client_secret = _settings.client_secret
+redirect_uri = _settings.redirect_uri
+authorization_url = _settings.authorization_url or AUTHORIZE_URL
+token_url = _settings.token_url or TOKEN_URL
+revoke_url = _settings.revoke_url or REVOKE_URL
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 TOKEN_PATH = DATA_DIR / "whoop_token.json"
