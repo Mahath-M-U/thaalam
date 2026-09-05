@@ -97,7 +97,7 @@ def oauth_callback(
     the request may not carry the app's cookie. The single-use `state` written
     by the admin-only /connect is what authorises it.
     """
-    frontend = get_settings().frontend_url or "http://localhost:5173"
+    frontend = get_settings().frontend_url or "http://localhost:3001"
     if error:
         return RedirectResponse(f"{frontend}/?whoop=error", status_code=302)
     if not code:

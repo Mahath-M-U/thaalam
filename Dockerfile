@@ -1,5 +1,5 @@
 # Thaalam — single-container image for Dokploy.
-# Serves FastAPI backend + built React frontend from the same origin (port 8000).
+# Serves FastAPI backend + built React frontend from the same origin (port 8001).
 # Dokploy terminates TLS for your custom domain; the app just listens on $PORT.
 
 # ---------- Stage 1: build the React frontend ----------
@@ -22,9 +22,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# curl is only for the container HEALTHCHECK.
+# curl for the HEALTHCHECK; gosu to drop privileges in the entrypoint after
+# fixing volume ownership (see docker-entrypoint.sh).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
+    && apt-get install -y --no-install-recommends curl gosu \
     && rm -rf /var/lib/apt/lists/*
 
 # Backend source. pyproject.toml declares all runtime deps
@@ -49,22 +50,31 @@ COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 # and every account. The app refuses to start in production if it resolves
 # there.
 ENV APP_ENV=production \
-    PORT=8000 \
+    PORT=8001 \
     DATA_DIR=/app/data
 
-# Run as a non-root user; /app/data holds the WHOOP token and the auth
-# database. Ownership is set before VOLUME so the named volume inherits it.
+# The app runs as a non-root user -- /app/data holds the WHOOP token and the
+# auth database. Privileges are dropped in the entrypoint rather than with
+# USER, because a volume created by an earlier root-running image stays
+# root-owned and the app could not write to it. The entrypoint fixes that
+# first, then steps down.
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN useradd --create-home --uid 10001 thaalam \
     && mkdir -p /app/data \
-    && chown -R thaalam:thaalam /app
-USER thaalam
+    && chown -R thaalam:thaalam /app \
+    && chmod +x /usr/local/bin/docker-entrypoint.sh
 
 VOLUME ["/app/data"]
 
-EXPOSE 8000
+# One port serves both halves: FastAPI returns the API under /api and the
+# built React app for everything else, so there is no separate frontend port
+# to route and no cross-origin request to allow.
+EXPOSE 8001
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
+    CMD curl -f http://localhost:${PORT:-8001}/health || exit 1
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
 # Started through run_api.py rather than uvicorn directly, so the production
 # serving rules live in one place: bind 0.0.0.0, trust the proxy's forwarded

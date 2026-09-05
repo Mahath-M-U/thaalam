@@ -71,11 +71,11 @@ uv run python -m thaalam.app
 
 ```bash
 uv run run_api.py
-# equivalent: uv run uvicorn thaalam.api.main:app --reload --port 8000
+# equivalent: uv run uvicorn thaalam.api.main:app --reload --port 8001
 ```
 
-- API: http://127.0.0.1:8000  
-- OpenAPI docs: http://127.0.0.1:8000/docs (disabled when `APP_ENV=production`)  
+- API: http://127.0.0.1:8001  
+- OpenAPI docs: http://127.0.0.1:8001/docs (disabled when `APP_ENV=production`)  
 
 ### Main endpoints
 
@@ -100,7 +100,11 @@ cd frontend
 npm run dev
 ```
 
-Open http://localhost:5173 — Vite proxies `/api` and `/health` to the FastAPI server.
+Open http://localhost:3001 — Vite proxies `/api` and `/health` to the API on 8001.
+
+Two ports exist only in development. The production image serves the built
+frontend from the API itself on a single port (8001), which is what removes
+the need for CORS.
 
 ## Optional: static HTML report
 

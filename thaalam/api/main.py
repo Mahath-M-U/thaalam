@@ -2,9 +2,9 @@
 
 Run from the project root:
 
-    uv run uvicorn thaalam.api.main:app --reload --port 8000
+    uv run uvicorn thaalam.api.main:app --reload --port 8001
 
-The React frontend (``frontend/``) expects this API on port 8000 during
+The React frontend (``frontend/``) expects this API on port 8001 during
 development (Vite proxies ``/api`` and ``/health``).
 """
 

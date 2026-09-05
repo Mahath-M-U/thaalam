@@ -27,7 +27,7 @@ def main() -> None:
     uvicorn.run(
         "thaalam.api.main:app",
         host=os.getenv("HOST") or ("0.0.0.0" if production else "127.0.0.1"),
-        port=int(os.getenv("PORT") or 8000),
+        port=int(os.getenv("PORT") or 8001),
         reload=not production,
         workers=1,
         # Behind a proxy every request otherwise appears to come from the

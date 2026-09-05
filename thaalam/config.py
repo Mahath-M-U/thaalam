@@ -45,10 +45,10 @@ NON_DEV_ENV_NAMES = frozenset({"prod", "production", "staging"})
 _TRUTHY = frozenset({"1", "true", "yes", "on"})
 
 DEV_CORS_ORIGINS = (
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:4173",
-    "http://127.0.0.1:4173",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+    "http://localhost:3002",
+    "http://127.0.0.1:3002",
 )
 
 
@@ -117,7 +117,7 @@ class Settings(BaseSettings):
     whoop_require_token_key: bool = False
 
     # Web surface.
-    frontend_url: str = "http://localhost:5173"
+    frontend_url: str = "http://localhost:3001"
     allowed_origins: str = ""
     log_level: str = "INFO"
 
@@ -240,7 +240,12 @@ class Settings(BaseSettings):
             if raw is None:
                 state = "it is not present in this process's environment at all"
             else:
-                state = f"it is present but blank ({len(raw)} char(s) of whitespace)"
+                # Quotes pasted into a hosting UI become part of the value, so
+                # say what was there rather than just "empty".
+                state = (
+                    f"it is present but empty once trimmed "
+                    f"(received {len(raw)} character(s): {raw!r})"
+                )
             problems.append(
                 f"WHOOP_TOKEN_KEY must be set -- {state}.\n"
                 "      It encrypts the stored WHOOP token; generated inside a\n"
