@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from datetime import timedelta
 
 import pytest
@@ -96,6 +97,54 @@ def test_garbage_hash_never_verifies():
 # ---------------------------------------------------------------------------
 # Sessions
 # ---------------------------------------------------------------------------
+
+
+def test_a_connection_can_be_used_and_closed_from_another_thread(auth_db_path):
+    """FastAPI schedules sync dependencies across its threadpool.
+
+    Setup, the route handler and teardown can each land on a different
+    thread, so a connection opened during setup gets used and closed
+    elsewhere. sqlite3 refuses that by default, which surfaced only under
+    real parallel load: every request 500'd on teardown.
+    """
+    failures: list[Exception] = []
+    manager = auth_store.connect(auth_db_path)
+    con = manager.__enter__()
+
+    def use_then_close() -> None:
+        try:
+            auth_store.count_users(con)
+            manager.__exit__(None, None, None)
+        except Exception as exc:  # noqa: BLE001 - reported through the list
+            failures.append(exc)
+
+    worker = threading.Thread(target=use_then_close)
+    worker.start()
+    worker.join()
+
+    assert not failures, f"cross-thread use failed: {failures[0]}"
+
+
+def test_parallel_requests_do_not_trip_over_each_other(client, auth_db):
+    """The shape of the original report: several requests actually in flight."""
+    _make_user(auth_db)
+    _login(client)
+
+    results: list[int] = []
+    lock = threading.Lock()
+
+    def hit() -> None:
+        status = client.get("/api/auth/me").status_code
+        with lock:
+            results.append(status)
+
+    threads = [threading.Thread(target=hit) for _ in range(12)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert results == [200] * 12
 
 
 def test_session_token_is_never_stored_in_the_clear(auth_db):

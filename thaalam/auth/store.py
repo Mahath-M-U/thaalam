@@ -130,10 +130,18 @@ def connect(path: str | Path | None = None) -> Iterator[sqlite3.Connection]:
 
     A fresh connection per operation rather than a shared one: WAL mode makes
     that cheap, and it keeps request threads from serialising on a global lock.
+
+    `check_same_thread=False` because FastAPI runs sync dependencies on its
+    threadpool, and the setup, the route handler and the teardown can each be
+    scheduled onto a different thread -- so sqlite3's default would refuse to
+    close a connection it had happily opened moments earlier. Those three
+    steps run one after another rather than at the same time, and the
+    connection never leaves the request that made it, so nothing here is
+    shared concurrently.
     """
     resolved = resolve_db_path(path)
     resolved.parent.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(resolved, timeout=10.0)
+    con = sqlite3.connect(resolved, timeout=10.0, check_same_thread=False)
     con.row_factory = sqlite3.Row
     try:
         con.execute("PRAGMA journal_mode=WAL")
