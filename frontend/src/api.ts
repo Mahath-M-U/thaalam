@@ -186,6 +186,11 @@ export const api = {
   briefExplain: (question: string) =>
     requestJson<BriefExplainerResponse>(`/api/brief/explain?question=${encodeURIComponent(question)}`),
   sync: () => requestJson<{ ok: boolean }>("/api/sync", { method: "POST" }),
+  // Ground truth for "is there a WHOOP token stored", so the dashboard can
+  // tell "never connected" (offer Connect) apart from "connected, first
+  // sync still running" (offer Check again) instead of showing the raw
+  // 404/409 detail text either error produces. Admin-only server-side.
+  whoopStatus: () => requestJson<{ connected: boolean }>("/api/oauth/whoop/status"),
   vitality: () => requestJson<VitalityResponse>("/api/derived/vitality"),
   derivedReads: () => requestJson<DerivedReadsResponse>("/api/derived/reads"),
   derivedReadDive: (id: string) =>

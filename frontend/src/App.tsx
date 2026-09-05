@@ -31,6 +31,7 @@ import { RunwayDive } from "./components/deepDives/RunwayDive";
 import { Section } from "./components/Section";
 import { SleepDetailTable } from "./components/SleepDetailTable";
 import { StatCards } from "./components/StatCards";
+import { WhoopConnectionPanel } from "./components/WhoopConnectionPanel";
 import { api } from "./api";
 import { EMPTY_VITALITY, useDashboardData } from "./hooks/useDashboardData";
 import type {
@@ -153,6 +154,33 @@ export default function App() {
 
   const displayError = syncError || error;
 
+  // Ground truth for whichever error the dashboard is showing: a 404 "no
+  // database" on first load and a 409 "not connected" from a failed sync
+  // are the same underlying fact (no WHOOP token stored yet), so ask the
+  // server rather than parse either error's detail text. Admin-only
+  // route -- a viewer can't know this and doesn't need to; they're told to
+  // ask an admin instead. Re-runs on every new error, which is what lets
+  // "Check again" (after actually connecting) resolve to true.
+  const [whoopConnected, setWhoopConnected] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!displayError || !isAdmin) {
+      setWhoopConnected(null);
+      return;
+    }
+    let cancelled = false;
+    api
+      .whoopStatus()
+      .then((res) => {
+        if (!cancelled) setWhoopConnected(res.connected);
+      })
+      .catch(() => {
+        if (!cancelled) setWhoopConnected(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [displayError, isAdmin]);
+
   const name =
     data?.profile.profile.first_name ||
     data?.profile.profile.email ||
@@ -230,6 +258,8 @@ export default function App() {
         syncError={data ? syncError : null}
         onRetry={() => void handleRefresh()}
         syncing={syncing}
+        whoopConnected={whoopConnected}
+        isAdmin={isAdmin}
       >
         {loading && !data ? (
           <div className="state-panel">
@@ -238,15 +268,14 @@ export default function App() {
           </div>
         ) : displayError && !data ? (
           <div className="state-panel error">
-            <h2>{syncError ? "Could not refresh WHOOP data" : "Could not load data"}</h2>
-            <p>{displayError}</p>
-            <button
-              type="button"
-              className="btn"
-              onClick={() => void (syncError ? handleRefresh() : reload())}
-            >
-              Try again
-            </button>
+            <h2>{whoopConnected === false ? "Connect your WHOOP" : "Could not load data"}</h2>
+            <WhoopConnectionPanel
+              connected={whoopConnected}
+              isAdmin={isAdmin}
+              syncing={syncing}
+              detail={displayError}
+              onCheckAgain={() => void (syncError ? handleRefresh() : reload())}
+            />
           </div>
         ) : mobileTab === "reads" ? (
           <ReadsView reads={reads} onOpen={setOpenRead} />
@@ -264,6 +293,8 @@ export default function App() {
             onRefresh={() => void handleRefresh()}
             syncing={syncing}
             syncError={syncError}
+            whoopConnected={whoopConnected}
+            isAdmin={isAdmin}
             onVitalityOpenChange={setMobileModalOpen}
           />
         )}
@@ -392,20 +423,14 @@ export default function App() {
 
         {displayError && !loading && (
           <div className="state-panel error">
-            <h2>{syncError ? "Could not refresh WHOOP data" : "Could not load data"}</h2>
-            <p>{displayError}</p>
-            <p className="muted">
-              Start the API with <code>uv run run_api.py</code>, connect at{" "}
-              <code>/api/oauth/whoop/connect</code>, or run{" "}
-              <code>uv run main.py</code>.
-            </p>
-            <button
-              type="button"
-              className="btn"
-              onClick={() => void (syncError ? handleRefresh() : reload())}
-            >
-              Try again
-            </button>
+            <h2>{whoopConnected === false ? "Connect your WHOOP" : "Could not load data"}</h2>
+            <WhoopConnectionPanel
+              connected={whoopConnected}
+              isAdmin={isAdmin}
+              syncing={syncing}
+              detail={displayError}
+              onCheckAgain={() => void (syncError ? handleRefresh() : reload())}
+            />
           </div>
         )}
 
