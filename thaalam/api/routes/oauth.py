@@ -127,7 +127,7 @@ def oauth_callback(
         client_ip=client_ip(request),
         request_id=request_id_var.get(),
     )
-    background_tasks.add_task(_run_oauth_backfill)
+    background_tasks.add_task(_run_oauth_backfill, pending.get("user_id"))
     return RedirectResponse(f"{frontend}/?whoop=connected", status_code=302)
 
 
@@ -150,18 +150,42 @@ def _frontend_base(request: Request) -> str:
     return str(request.base_url).rstrip("/")
 
 
-def _run_oauth_backfill() -> None:
+def _run_oauth_backfill(user_id: int | None) -> None:
+    """Runs after the callback has already responded (see `background_tasks`).
+
+    A failure here used to be visible only in the container's own logs --
+    Administration -> Audit showed "whoop.connected" and then nothing, so a
+    dashboard that stayed empty after a successful connect had no way to
+    tell "still importing" from "the import broke" without reading logs no
+    Dokploy Environment tab gives you. Recording the outcome here, success
+    or failure, makes that the same one click as everything else in Audit.
+    """
     client: WhoopClient | None = None
     try:
         client = build_whoop_client()
         con = acquire_writable_connection()
         try:
-            backfill_window(client, days=BACKFILL_DAYS, con=con)
+            result = backfill_window(client, days=BACKFILL_DAYS, con=con)
             recompute(con, trigger="backfill")
         finally:
             con.close()
-    except Exception:
+    except Exception as exc:
         logger.exception("90-day WHOOP backfill after OAuth failed")
+        with auth_store.connect() as auth_con:
+            auth_store.record_audit(
+                auth_con,
+                "whoop.backfill_failed",
+                user_id=user_id,
+                detail=str(exc) or exc.__class__.__name__,
+            )
+    else:
+        with auth_store.connect() as auth_con:
+            auth_store.record_audit(
+                auth_con,
+                "whoop.backfill_completed",
+                user_id=user_id,
+                detail=f"{result.get('records', 0)} record(s) over {BACKFILL_DAYS} days",
+            )
     finally:
         if client is not None:
             client.close()
