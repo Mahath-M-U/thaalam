@@ -26,3 +26,20 @@ dev = [
     "httpx>=0.28.0",
     "pytest>=9.1.1",
 ]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+# Without this, `pip install .` fails outright: setuptools' flat-layout
+# discovery sees the `thaalam` package next to main.py, run_api.py and
+# generate_report.py and refuses to guess. Local `uv run` never noticed,
+# because it imports the package from the working directory rather than
+# installing it -- but the container image installs, so it could not build.
+[tool.setuptools.packages.find]
+include = ["thaalam*"]
+
+# The root scripts are entrypoints copied in beside the package, not modules
+# to ship inside the distribution.
+[tool.setuptools]
+py-modules = []
