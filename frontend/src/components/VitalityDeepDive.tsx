@@ -8,7 +8,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { AMBER, axisLine, axisTick, gridStroke, tooltipStyle } from "../chartTheme";
+import { INK, WASH_MINT, axisLine, axisTick, gridStroke, tooltipStyle } from "../chartTheme";
 import type { VitalityPart, VitalityResponse } from "../types";
 import { shortDate } from "../utils";
 
@@ -31,13 +31,13 @@ export function ScoreRing({
   return (
     <div className={`score-ring${dimmed ? " is-dimmed" : ""}`} style={{ width: size, height: size }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
-        <circle cx={cx} cy={cx} r={r} fill="none" stroke="#333333" strokeWidth={stroke} />
+        <circle cx={cx} cy={cx} r={r} fill="none" stroke="#e7e5e4" strokeWidth={stroke} />
         <circle
           cx={cx}
           cy={cx}
           r={r}
           fill="none"
-          stroke="#FFC400"
+          stroke={INK}
           strokeWidth={stroke}
           strokeLinecap="round"
           strokeDasharray={`${dash} ${c}`}
@@ -180,7 +180,7 @@ export function VitalityDeepDive({ vitality, onClose }: Props) {
                 <li key={part.key}>
                   <span
                     className="swatch"
-                    style={{ background: AMBER, opacity: OPACITY[i] ?? 0.28 }}
+                    style={{ background: INK, opacity: OPACITY[i] ?? 0.28 }}
                   />
                   {part.name}
                   <em>{part.pts}</em>
@@ -233,7 +233,7 @@ export function VitalityDeepDive({ vitality, onClose }: Props) {
             <>
               <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={trend} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-                  <ReferenceArea y1={800} y2={1000} fill={AMBER} fillOpacity={0.14} />
+                  <ReferenceArea y1={800} y2={1000} fill={WASH_MINT} fillOpacity={0.55} />
                   <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
                   <XAxis
                     dataKey="label"
@@ -261,15 +261,15 @@ export function VitalityDeepDive({ vitality, onClose }: Props) {
                   <Line
                     type="monotone"
                     dataKey="score"
-                    stroke="#FFFFFF"
+                    stroke={INK}
                     strokeWidth={2}
                     dot={false}
-                    activeDot={{ r: 4, fill: AMBER, stroke: "#000" }}
+                    activeDot={{ r: 4, fill: INK, stroke: "#ffffff" }}
                   />
                 </LineChart>
               </ResponsiveContainer>
               <p className="chart-footnote">
-                30-day vitality · white is the score · amber wash is the optimal zone 800–1000
+                30-day vitality · ink is the score · the mint wash is the optimal zone 800–1000
               </p>
             </>
           )}

@@ -13,8 +13,8 @@ import { ChartCard } from "../ChartCard";
 import { CalibratingNote, DeepDive } from "../DeepDive";
 import { shortDate } from "../../utils";
 import {
-  AMBER,
-  AMBER_08,
+  INK,
+  WASH_PEACH,
   axisLine,
   axisTick,
   CHART_COLORS,
@@ -140,7 +140,7 @@ export function CardiacEfficiencyPreview({
           <XAxis dataKey="label" tick={axisTick} axisLine={axisLine} tickLine={false} minTickGap={24} />
           <YAxis tick={axisTick} axisLine={false} tickLine={false} width={36} domain={["auto", "auto"]} />
           <Tooltip contentStyle={tooltipStyle} />
-          <Line type="monotone" dataKey="hr" name="Avg HR" stroke={AMBER} strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey="hr" name="Avg HR" stroke={INK} strokeWidth={2} dot={false} />
         </LineChart>
       </ResponsiveContainer>
       <p className="chart-footnote">{read.methodology}</p>
@@ -176,10 +176,10 @@ function SportEfficiencyChart({ sport, compact }: { sport: CardiacSportDive; com
             type="monotone"
             dataKey="hr"
             name="Avg HR"
-            stroke={CHART_COLORS.amber}
+            stroke={CHART_COLORS.ink}
             strokeWidth={2}
             dot={false}
-            fill={AMBER_08}
+            fill={WASH_PEACH}
           />
         </LineChart>
       </ResponsiveContainer>

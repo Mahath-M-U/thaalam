@@ -13,10 +13,10 @@ export function formatNumber(value: number | null | undefined, digits = 1): stri
 
 /** Temporary 34/67 opacity ladder until personal bands exist. Not an own-band. */
 export function recoveryColor(score: number | null | undefined): string {
-  if (score == null || Number.isNaN(score)) return "#8A8A8A";
-  if (score < 34) return "rgba(255,196,0,0.35)";
-  if (score < 67) return "rgba(255,196,0,0.6)";
-  return "#FFC400";
+  if (score == null || Number.isNaN(score)) return "#a8a29e";
+  if (score < 34) return "rgba(12,10,9,0.35)";
+  if (score < 67) return "rgba(12,10,9,0.6)";
+  return "#0c0a09";
 }
 
 function matchLeadingCase(source: string, replacement: string): string {

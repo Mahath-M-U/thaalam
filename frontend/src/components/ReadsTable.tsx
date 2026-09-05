@@ -1,5 +1,5 @@
 import type { DerivedRead, ReadGroup } from "../types";
-import { AMBER } from "../chartTheme";
+import { INK, MUTED_SOFT } from "../chartTheme";
 
 const GROUPS: { id: ReadGroup; label: string }[] = [
   { id: "sleep", label: "Sleep" },
@@ -82,7 +82,7 @@ export function Sparkline({
     <svg className="sparkline" width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden="true">
       <polyline
         fill="none"
-        stroke={favourable ? AMBER : "#8A8A8A"}
+        stroke={favourable ? INK : MUTED_SOFT}
         strokeWidth="2"
         strokeLinejoin="round"
         strokeLinecap="round"
