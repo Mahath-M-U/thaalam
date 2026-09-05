@@ -58,6 +58,12 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     volumes:
       - thaalam_data:/app/data
+    networks:
+      # Traefik reaches containers over this network, not over the published
+      # port. A service that is not on it is unroutable however correct the
+      # domain and the app are, and the symptom is a 502 that looks like the
+      # app is down. Dokploy creates the network when it installs itself.
+      - dokploy-network
     healthcheck:
       # Same blind spot as the Dockerfile's: a loopback check passes while
       # the proxy gets connection refused, so test the routable address.
@@ -68,6 +74,10 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
+
+networks:
+  dokploy-network:
+    external: true
 
 volumes:
   thaalam_data:

@@ -14,6 +14,7 @@ from pathlib import Path
 
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, HTTPException, Request
@@ -49,6 +50,23 @@ _background: set[asyncio.Task] = set()
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    # One line that answers the questions a bad deploy actually raises: which
+    # environment won, which port the proxy has to target, whether the built
+    # frontend made it into the image, and where the OAuth callback will send
+    # the browser. Working these out from a 502 and a healthy container is
+    # otherwise a long afternoon.
+    # Built into the message rather than `extra`, because the JSON formatter
+    # only promotes a fixed set of extra fields and this has to be readable in
+    # whichever format the deployment happens to be using.
+    logger.info(
+        "Thaalam serving: app_env=%s port=%s (point the reverse proxy here) "
+        "frontend_bundled=%s oauth_redirect=%s data_dir=%s",
+        settings.app_env,
+        os.getenv("PORT") or "8001",
+        FRONTEND_DIST is not None,
+        settings.resolved_frontend_url or "<origin of the request>",
+        settings.resolved_data_dir,
+    )
     task = scheduler.start(_background)
     try:
         yield

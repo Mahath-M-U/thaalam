@@ -188,6 +188,8 @@ there — the single-use `state` from the admin-only connect step authorises it.
 
 ## Production deployment
 
+Deploying to a container host, or looking at a `502 Bad Gateway`? [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) has the build order, the Dokploy Application/Compose differences, and a triage order for 502s.
+
 ```bash
 cp .env.example .env      # then fill it in; APP_ENV=production
 ```
