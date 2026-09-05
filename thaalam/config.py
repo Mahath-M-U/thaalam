@@ -232,12 +232,22 @@ class Settings(BaseSettings):
             # filesystem, which is not the mounted volume -- so the next
             # redeploy would take the key with it and leave the stored WHOOP
             # token permanently undecryptable.
+            #
+            # "absent" and "present but blank" are very different mistakes --
+            # one means the host never passed the variable, the other means it
+            # was set to nothing -- and from a deploy log they look identical.
+            raw = os.getenv("WHOOP_TOKEN_KEY")
+            if raw is None:
+                state = "it is not present in this process's environment at all"
+            else:
+                state = f"it is present but blank ({len(raw)} char(s) of whitespace)"
             problems.append(
-                "WHOOP_TOKEN_KEY must be set. It encrypts the stored WHOOP\n"
-                "      token; generated inside the container it would be lost on\n"
-                "      the next redeploy, leaving the token unreadable.\n"
-                "      Generate one now, set it in your host's environment, and\n"
-                "      keep it -- changing it later means reconnecting WHOOP:\n"
+                f"WHOOP_TOKEN_KEY must be set -- {state}.\n"
+                "      It encrypts the stored WHOOP token; generated inside a\n"
+                "      container it would be lost on the next redeploy, leaving\n"
+                "      the token unreadable. Generate one, set it in your host's\n"
+                "      environment, and keep it -- changing it later means\n"
+                "      reconnecting WHOOP:\n"
                 "        python -c \"import os,base64; "
                 'print(base64.urlsafe_b64encode(os.urandom(32)).decode())"'
             )
