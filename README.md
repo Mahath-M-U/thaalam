@@ -92,6 +92,9 @@ uv run run_api.py
 | GET | `/api/workouts` | Workouts |
 | GET | `/api/workouts/by-sport` | Avg strain by sport |
 | GET | `/api/insights` | Derived insights (HRV baseline, ACWR, sleep debt, lag effects, …) |
+| GET | `/api/chat/status` | Whether the assistant is configured (never returns the key) |
+| GET | `/api/chat/suggestions` | Starter questions for one page |
+| POST | `/api/chat` | Page-aware assistant answer, grounded in your own data |
 
 ## 4. Start the React dashboard
 
@@ -150,6 +153,55 @@ The **Insights** tab (`GET /api/insights`) computes extra analytics from the sam
 | 7-day rolling trends | Smoothed recovery & strain |
 
 These are **local, descriptive** analytics — not medical advice or injury prediction.
+
+## The assistant (optional)
+
+A chat dock sits on every page of the dashboard. Ask it about what you are
+looking at — "why is my recovery here?", "is this load sustainable?" — and it
+answers from **your own synced data** and the baselines computed from it.
+
+It is off unless you set an API key:
+
+```bash
+OPENROUTER_API_KEY=sk-or-...      # from https://openrouter.ai/keys
+```
+
+With no key, `/api/chat/status` reports `enabled: false`, the dashboard hides
+the dock, and nothing else changes — every chart and the rule-based daily brief
+stay entirely local with no outbound request. The startup log line says which
+state you are in (`assistant=on (…)` / `assistant=off (…)`), including the case
+where the variable was passed but empty.
+
+**How answers stay honest.**
+
+- The browser sends only *where* you asked from — a page key, and which read is
+  open. Every figure in the prompt is read out of DuckDB server-side, so an
+  answer cannot be steered onto a false premise by a crafted request, and it
+  cannot repeat a stale number the page happened to still be showing.
+- The active page's analytics lead the prompt; the rest of the picture follows,
+  so a cross-cutting question still gets a straight answer.
+- The model is instructed to quote the figures it uses with the baseline they
+  are measured against, and to say which metric is missing rather than
+  estimate one. With no synced history it is told to say so.
+- Same disclaimer as the rest of the app: descriptive analytics on your own
+  history, never medical advice or diagnosis.
+
+**Free models, and why none is hardcoded.** The app uses OpenRouter's free
+tier. Which model slugs are free is decided by the upstream providers and
+rotates continuously, so a slug pinned at build time becomes a 404 within
+weeks. Instead the app asks OpenRouter which models are free *right now*
+(price zero both directions), ranks them by suitability and context window,
+caches that for six hours, and retires any slug that answers "gone" or
+"rate-limited" for fifteen minutes before trying the next. Pin one with
+`OPENROUTER_MODEL=` if you would rather choose.
+
+**Budget.** Free models allow 20 requests/minute and 50/day, rising to
+1,000/day once the account has bought $10 of credits at any point. That
+allowance belongs to the key and is shared by everyone using the deployment,
+so each account is capped at `CHAT_REQUESTS_PER_HOUR` (default 30) and a
+spent allowance surfaces as "try again shortly", not as an error.
+
+See `.env.example` for every knob.
 
 ## Security model
 
@@ -281,4 +333,9 @@ from cron instead if you prefer.
 ## Notes
 
 - DuckDB allows one writer at a time. The API opens **read-only** connections so you can view the dashboard while a sync is not holding a write lock.
-- Data leaves your machine only when talking to WHOOP, and to whoever you invite.
+- Data leaves your machine only when talking to WHOOP, to whoever you invite,
+  and — if and only if you set `OPENROUTER_API_KEY` — to OpenRouter when you
+  ask the assistant a question. That request carries the grounding block for
+  the page you asked from: your current metrics, their baselines and the
+  derived findings. It carries no account identity, no email and no raw WHOOP
+  rows. Leave the key unset and the assistant never runs, so nothing is sent.

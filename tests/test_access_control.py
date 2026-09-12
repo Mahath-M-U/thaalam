@@ -38,6 +38,8 @@ READ_ENDPOINTS = [
     "/api/derived/reads",
     "/api/derived/reads/hyperarousal",
     "/api/derived/runway",
+    "/api/chat/status",
+    "/api/chat/suggestions?page=sleep",
 ]
 
 #: Endpoints only an administrator may reach.
@@ -110,6 +112,13 @@ def test_admin_endpoints_reject_anonymous_callers(client, method, path):
 
 def test_brief_rejects_anonymous_callers(client):
     assert client.post("/api/brief").status_code == 401
+
+
+def test_chat_rejects_anonymous_callers(client):
+    """The assistant spends a rationed upstream allowance, so an
+    unauthenticated caller must never reach it."""
+    response = client.post("/api/chat", json={"messages": [{"role": "user", "content": "hi"}]})
+    assert response.status_code == 401
 
 
 def test_no_data_leaks_in_an_unauthenticated_error(client):

@@ -1,5 +1,6 @@
 import type { DerivedRead, ReadGroup } from "../types";
 import { AMBER } from "../chartTheme";
+import { AskButton } from "./chat/AskButton";
 
 const GROUPS: { id: ReadGroup; label: string }[] = [
   { id: "sleep", label: "Sleep" },
@@ -16,7 +17,15 @@ interface Props {
 export function ReadsTable({ reads, onOpen, heading = "All eleven reads" }: Props) {
   return (
     <section id="reads" className="section reads-section">
-      {heading ? <h2 className="section-title">{heading}</h2> : null}
+      {heading ? (
+        <div className="section-head">
+          <h2 className="section-title">{heading}</h2>
+          <AskButton
+            question="Which of my reads should I act on first, and why?"
+            label="Ask about these"
+          />
+        </div>
+      ) : null}
       {GROUPS.map((group) => {
         const rows = reads.filter((read) => read.group === group.id);
         if (rows.length === 0) return null;

@@ -471,3 +471,48 @@ export interface RunwayResponse {
   cta: string | null;
 }
 
+
+/**
+ * The assistant. `ChatPage` is the vocabulary the server scopes answers by:
+ * a question asked on the Sleep page is answered from sleep analytics first.
+ */
+export type ChatPage =
+  | "overview"
+  | "insights"
+  | "recovery"
+  | "strain"
+  | "sleep"
+  | "workouts"
+  | "reads"
+  | "read"
+  | "runway"
+  | "today"
+  | "admin";
+
+export interface ChatStatusResponse {
+  enabled: boolean;
+  model: string;
+  pages: string[];
+  requests_per_hour: number;
+}
+
+export interface ChatSuggestionsResponse {
+  page: string;
+  suggestions: string[];
+}
+
+export interface ChatReplyResponse {
+  reply: string;
+  model: string;
+  page: string;
+  /** Which data the answer was grounded in, for the "based on" footnote. */
+  grounded_on: string[];
+  /** False when no WHOOP history is synced yet. */
+  ready: boolean;
+  usage: Record<string, number>;
+}
+
+export interface ChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}

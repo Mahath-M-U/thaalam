@@ -91,7 +91,11 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays, onOpenRead }: P
     }));
 
   return (
-    <Section id="insights" title="Derived insights">
+    <Section
+      id="insights"
+      title="Derived insights"
+      ask="Which of these insights matters most for me right now, and what should I do about it?"
+    >
       <DailyBriefCard brief={dailyBrief} />
 
       <div className="insight-meta wide">

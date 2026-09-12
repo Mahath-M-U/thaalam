@@ -31,7 +31,17 @@ from thaalam.api.middleware import (
     SecurityHeadersMiddleware,
 )
 from thaalam.api import scheduler
-from thaalam.api.routes import admin, auth, briefs, data, derived, health, oauth, webhooks
+from thaalam.api.routes import (
+    admin,
+    auth,
+    briefs,
+    chat,
+    data,
+    derived,
+    health,
+    oauth,
+    webhooks,
+)
 from thaalam.config import get_settings
 from thaalam.logging_config import request_id_var, setup_logging
 
@@ -48,6 +58,20 @@ _docs_enabled = not settings.is_production
 _background: set[asyncio.Task] = set()
 
 
+def _assistant_state() -> str:
+    """One word for whether the chat dock will work, and why not if it won't."""
+    if not settings.chat_enabled:
+        return "off (CHAT_ENABLED=false)"
+    if not settings.openrouter_api_key.strip():
+        # Distinguish "never passed" from "passed empty" -- from a deploy log
+        # those look identical but are different mistakes.
+        for name in ("OPENROUTER_API_KEY", "OPROUTER_API_KEY"):
+            if os.getenv(name) is not None:
+                return f"off ({name} is present but empty once trimmed)"
+        return "off (no OPENROUTER_API_KEY in this process's environment)"
+    return f"on (model={settings.openrouter_model.strip() or 'auto-selected free'})"
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     # One line that answers the questions a bad deploy actually raises: which
@@ -58,14 +82,18 @@ async def lifespan(_app: FastAPI):
     # Built into the message rather than `extra`, because the JSON formatter
     # only promotes a fixed set of extra fields and this has to be readable in
     # whichever format the deployment happens to be using.
+    # `assistant` is here for the same reason the WHOOP key state is logged:
+    # a chat dock that silently never appears is indistinguishable from a
+    # deployment that set OPENROUTER_API_KEY into the wrong place.
     logger.info(
         "Thaalam serving: app_env=%s port=%s (point the reverse proxy here) "
-        "frontend_bundled=%s oauth_redirect=%s data_dir=%s",
+        "frontend_bundled=%s oauth_redirect=%s data_dir=%s assistant=%s",
         settings.app_env,
         os.getenv("PORT") or "8001",
         FRONTEND_DIST is not None,
         settings.resolved_frontend_url or "<origin of the request>",
         settings.resolved_data_dir,
+        _assistant_state(),
     )
     task = scheduler.start(_background)
     try:
@@ -134,6 +162,7 @@ app.include_router(briefs.router)
 app.include_router(oauth.router)
 app.include_router(webhooks.router)
 app.include_router(derived.router)
+app.include_router(chat.router)
 
 
 def _find_frontend_dist() -> Path | None:

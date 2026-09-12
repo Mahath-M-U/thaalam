@@ -149,6 +149,47 @@ class Settings(BaseSettings):
     nightly_job_enabled: bool = True
     nightly_job_hour: int = 4
 
+    # ----------------------------------------------------------------
+    # OpenRouter-backed assistant (thaalam.services.llm_client)
+    # ----------------------------------------------------------------
+    #: The only outbound AI call the app makes. Unset means the assistant is
+    #: simply off -- every chat route reports `enabled: false` and the
+    #: dashboard hides the dock rather than offering a button that 503s.
+    #:
+    #: `OPROUTER_API_KEY` is accepted because that misspelling is what shipped
+    #: in `.env.example` and `docker-compose.yml`, so it is what existing
+    #: deployments have set. `OPENROUTER_API_KEY` is canonical and wins.
+    openrouter_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("OPENROUTER_API_KEY", "OPROUTER_API_KEY"),
+    )
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+
+    #: Pin a model slug to force one. Left empty the client discovers the
+    #: currently-free models and picks the best of them, which is the point:
+    #: OpenRouter's free roster is rotated by its providers, so a slug
+    #: hardcoded today is a 404 in a month.
+    openrouter_model: str = ""
+
+    #: Sent as `HTTP-Referer`/`X-Title`, which is how OpenRouter attributes
+    #: traffic to an app. Cosmetic, not authentication.
+    openrouter_app_url: str = ""
+    openrouter_app_title: str = "Thaalam"
+
+    chat_enabled: bool = True
+    chat_max_tokens: int = 800
+    #: How many prior turns travel with a question. The grounding block is the
+    #: expensive part of the prompt, so history is kept short deliberately.
+    chat_history_messages: int = 8
+    chat_max_question_chars: int = 2_000
+    chat_timeout_seconds: float = 60.0
+
+    #: Per-account cap. OpenRouter's free tier allows 20 requests/minute and
+    #: 50/day (1,000 once $10 of credits has ever been bought), shared across
+    #: the whole key -- so the app has to ration itself or one impatient user
+    #: spends the household's day.
+    chat_requests_per_hour: int = 30
+
     @field_validator("*", mode="before")
     @classmethod
     def _clean_strings(cls, v: object) -> object:
@@ -179,6 +220,11 @@ class Settings(BaseSettings):
         if configured:
             return configured
         return [] if self.is_production else list(DEV_CORS_ORIGINS)
+
+    @property
+    def chat_configured(self) -> bool:
+        """Whether the assistant has what it needs to answer at all."""
+        return bool(self.chat_enabled and self.openrouter_api_key.strip())
 
     @property
     def resolved_frontend_url(self) -> str:

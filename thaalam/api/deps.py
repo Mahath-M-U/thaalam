@@ -70,6 +70,24 @@ def get_readonly_connection() -> Generator[duckdb.DuckDBPyConnection, None, None
         con.close()
 
 
+def get_optional_readonly_connection() -> Generator[duckdb.DuckDBPyConnection | None, None, None]:
+    """Like `get_readonly_connection`, but yields None instead of raising 404.
+
+    For routes that have something useful to say with no database yet. The
+    assistant is the case that motivated it: "I have no data, what do I do?"
+    is a fair question, and a 404 telling the user to connect WHOOP is a worse
+    answer than the assistant giving them that instruction in prose.
+    """
+    if not Path(DB_PATH).exists():
+        yield None
+        return
+    con = _get_base_connection().cursor()
+    try:
+        yield con
+    finally:
+        con.close()
+
+
 def get_writable_connection() -> Generator[duckdb.DuckDBPyConnection, None, None]:
     """Yield a per-request DuckDB cursor for routes that also need to write
 
