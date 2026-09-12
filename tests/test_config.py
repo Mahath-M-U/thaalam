@@ -165,3 +165,62 @@ def test_configured_frontend_url_wins_and_loses_its_trailing_slash(
     monkeypatch.setenv("APP_ENV", app_env)
     monkeypatch.setenv("FRONTEND_URL", "https://thaalam.example/")
     assert Settings().resolved_frontend_url == "https://thaalam.example"
+
+
+# ---------------------------------------------------------------------------
+# The assistant's API key
+# ---------------------------------------------------------------------------
+
+
+def test_the_assistant_is_off_when_no_key_is_set():
+    """Absent is not an error: the dashboard simply hides the chat dock."""
+    settings = Settings()
+    assert settings.openrouter_api_key == ""
+    assert settings.chat_configured is False
+
+
+def test_the_canonical_key_name_is_read(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-canonical")
+    settings = Settings()
+    assert settings.openrouter_api_key == "sk-or-canonical"
+    assert settings.chat_configured is True
+
+
+def test_the_misspelled_key_name_still_works(monkeypatch):
+    """`OPROUTER_API_KEY` is what shipped in .env.example and
+    docker-compose.yml, so it is what existing deployments have set."""
+    monkeypatch.setenv("OPROUTER_API_KEY", "sk-or-legacy")
+    assert Settings().openrouter_api_key == "sk-or-legacy"
+
+
+def test_the_canonical_key_wins_over_the_misspelled_one(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-canonical")
+    monkeypatch.setenv("OPROUTER_API_KEY", "sk-or-legacy")
+    assert Settings().openrouter_api_key == "sk-or-canonical"
+
+
+def test_a_key_pasted_with_quotes_is_cleaned(monkeypatch):
+    """Quotes typed into the Dokploy Environment UI become part of the value,
+    which would make OpenRouter reject the key."""
+    monkeypatch.setenv("OPENROUTER_API_KEY", "'sk-or-quoted'")
+    assert Settings().openrouter_api_key == "sk-or-quoted"
+
+
+def test_a_blank_key_leaves_the_assistant_off(monkeypatch):
+    """"Present but empty" must not read as configured."""
+    monkeypatch.setenv("OPENROUTER_API_KEY", '" "')
+    assert Settings().chat_configured is False
+
+
+def test_the_assistant_can_be_disabled_with_the_key_left_in_place(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-canonical")
+    monkeypatch.setenv("CHAT_ENABLED", "false")
+    settings = Settings()
+    assert settings.openrouter_api_key == "sk-or-canonical"
+    assert settings.chat_configured is False
+
+
+def test_no_model_is_pinned_by_default():
+    """Blank is deliberate: the client discovers what is free at the time,
+    because OpenRouter's free roster is rotated by its providers."""
+    assert Settings().openrouter_model == ""

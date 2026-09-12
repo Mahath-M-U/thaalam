@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { DailyBriefResponse, DerivedRead, RunwayResponse, VitalityResponse } from "../../types";
 import { rewriteTriScaleCopy } from "../../utils";
+import { AskButton } from "../chat/AskButton";
 import { Sparkline } from "../ReadsTable";
 import { RunwayCard } from "../RunwayCard";
 import { ScoreMeters } from "../ScoreRingCard";
@@ -177,6 +178,13 @@ export function TodayView({
             ? rewriteTriScaleCopy(brief.brief)
             : rewriteTriScaleCopy(brief?.message) || "Not enough data yet for today's read."}
         </p>
+        <div className="today-read-ask">
+          <AskButton
+            question="What stands out in my data today, and what should I do about it?"
+            label="Ask about today"
+            send
+          />
+        </div>
       </article>
 
       {runway ? (

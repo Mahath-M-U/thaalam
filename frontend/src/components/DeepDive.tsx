@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { DerivedRead } from "../types";
+import { AskButton } from "./chat/AskButton";
 import { Sparkline } from "./ReadsTable";
 
 interface Props {
@@ -38,9 +39,18 @@ export function DeepDive({
   const meaningText = asMeaning(meaning) || asMeaning(finding);
   return (
     <article className={className ? `deep-dive ${className}` : "deep-dive"}>
-      <button type="button" className="deep-dive-back" onClick={onBack}>
-        ← Back
-      </button>
+      <div className="deep-dive-top">
+        <button type="button" className="deep-dive-back" onClick={onBack}>
+          ← Back
+        </button>
+        {/* Every read dive gets one. The dock is already scoped to this read,
+            so the answer is about the numbers on this screen. */}
+        <AskButton
+          question={`What does my "${title}" read mean, and what would move it?`}
+          label="Ask about this read"
+          send
+        />
+      </div>
       <div className="deep-dive-kicker">{kicker}</div>
       <h2>{title}</h2>
       {subtitle ? <p className="deep-dive-sub">{subtitle}</p> : null}

@@ -54,7 +54,13 @@ services:
       # Only the reverse proxy can reach this port, so trusting its
       # X-Forwarded-For is what makes throttling see real client addresses.
       FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-*}
+      # The in-dashboard assistant. Unset means it is simply off; see
+      # .env.example for the free-tier limits it rations itself against.
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       OPROUTER_API_KEY: ${OPROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
+      CHAT_ENABLED: ${CHAT_ENABLED:-true}
+      CHAT_REQUESTS_PER_HOUR: ${CHAT_REQUESTS_PER_HOUR:-30}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     volumes:
       - thaalam_data:/app/data

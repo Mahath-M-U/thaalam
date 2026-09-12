@@ -1,5 +1,9 @@
 import type {
   BriefExplainerResponse,
+  ChatReplyResponse,
+  ChatStatusResponse,
+  ChatSuggestionsResponse,
+  ChatTurn,
   CycleRecord,
   DailyBriefResponse,
   DailyRecord,
@@ -196,6 +200,33 @@ export const api = {
   derivedReadDive: (id: string) =>
     requestJson<DerivedReadDiveResponse>(`/api/derived/reads/${encodeURIComponent(id)}`),
   derivedRunway: () => requestJson<RunwayResponse>("/api/derived/runway"),
+
+  // The assistant. `chatStatus` is what decides whether the dock renders at
+  // all, so an install with no OPENROUTER_API_KEY shows no chat button rather
+  // than one that fails when pressed.
+  chatStatus: () => requestJson<ChatStatusResponse>("/api/chat/status"),
+  chatSuggestions: (page: string) =>
+    requestJson<ChatSuggestionsResponse>(
+      `/api/chat/suggestions?page=${encodeURIComponent(page)}`,
+    ),
+  // POST: it spends the deployment's rationed free-tier allowance, which also
+  // puts it behind CSRF protection. Only identifiers travel -- the server
+  // reads every figure out of the database itself.
+  chatSend: (
+    body: {
+      messages: ChatTurn[];
+      page: string;
+      read_id?: string | null;
+      range_days?: number | null;
+    },
+    signal?: AbortSignal,
+  ) =>
+    requestJson<ChatReplyResponse>("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal,
+    }),
 
   adminUsers: () => requestJson<AdminUser[]>("/api/admin/users"),
   adminCreateUser: (email: string, role: AdminUser["role"]) =>

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { RunwayResponse } from "../../types";
+import { AskButton } from "../chat/AskButton";
 import { RunwayChart } from "../RunwayCard";
 
 interface Props {
@@ -103,9 +104,17 @@ export function RunwayDive({ runway, onClose }: Props) {
         onClick={(event) => event.stopPropagation()}
       >
         <header className="runway-dive-header">
-          <button type="button" className="runway-dive-back" onClick={onClose}>
-            Back
-          </button>
+          <div className="runway-dive-top">
+            <button type="button" className="runway-dive-back" onClick={onClose}>
+              Back
+            </button>
+            {/* The dock sits above this modal, so it is usable from here. */}
+            <AskButton
+              question="What is limiting my runway right now, and what would extend it?"
+              label="Ask about my runway"
+              send
+            />
+          </div>
           <div className="runway-kicker">Recovery sustainability runway</div>
           <h2 id="runway-dive-title">{runway.headline ?? "Calibrating"}</h2>
         </header>

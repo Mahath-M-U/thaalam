@@ -3,6 +3,7 @@ import { api } from "../api";
 import type { DailyBriefResponse } from "../types";
 import { rewriteTriScaleCopy } from "../utils";
 import { ChartCard } from "./ChartCard";
+import { AskButton } from "./chat/AskButton";
 
 interface Props {
   brief: DailyBriefResponse;
@@ -85,6 +86,16 @@ export function DailyBriefCard({ brief }: Props) {
               )}
             </div>
           ))}
+          {/* The four answers above are computed by rules, which is why they
+              are instant and always the same. Anything outside those four
+              goes to the assistant instead -- kept visually separate so the
+              card's "no AI" claim stays true of the brief itself. */}
+          <div className="brief-followup">
+            <AskButton
+              question="I have a follow-up about today's brief: "
+              label="Ask a follow-up"
+            />
+          </div>
         </div>
       )}
     </ChartCard>

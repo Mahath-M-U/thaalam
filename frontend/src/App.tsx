@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useAuth } from "./auth/AuthContext";
 import { AdminView } from "./components/admin/AdminView";
 import { useAppRoute } from "./routes";
@@ -19,6 +19,9 @@ import { HyperarousalDive } from "./components/deepDives/HyperarousalDive";
 import { StageDependencyDive, StageDependencyPreview } from "./components/deepDives/StageDependencyDive";
 import { StrainSensitivityDive, StrainSensitivityPreview } from "./components/deepDives/StrainSensitivityDive";
 import { GenericReadDive } from "./components/DeepDive";
+import { AskButton } from "./components/chat/AskButton";
+import { ChatDock } from "./components/chat/ChatDock";
+import { ChatProvider, useChat } from "./chat/ChatProvider";
 import { InsightsPanel } from "./components/InsightsPanel";
 import { MobileShell, useIsMobile } from "./components/mobile/MobileShell";
 import { ReadsView } from "./components/mobile/ReadsView";
@@ -36,6 +39,7 @@ import { api } from "./api";
 import { EMPTY_VITALITY, useDashboardData } from "./hooks/useDashboardData";
 import type {
   CardiacSportDive,
+  ChatPage,
   DerivedRead,
   DerivedReadDiveResponse,
   DerivedReadsResponse,
@@ -55,6 +59,33 @@ import {
   RANGE_OPTIONS,
   type RangeDays,
 } from "./utils";
+
+/**
+ * Wraps a surface in the assistant: the provider that holds the
+ * conversation, plus the dock itself rendered above everything.
+ *
+ * Used by both the mobile and desktop branches below, so the assistant is
+ * present on every screen either one can show, with one definition of what
+ * "present" means.
+ */
+function WithChat({
+  page,
+  readId,
+  rangeDays,
+  children,
+}: {
+  page: ChatPage;
+  readId: string | null;
+  rangeDays: number;
+  children: ReactNode;
+}) {
+  return (
+    <ChatProvider page={page} readId={readId} rangeDays={rangeDays}>
+      {children}
+      <ChatDock />
+    </ChatProvider>
+  );
+}
 
 const NAV: { id: SectionId | "reads"; label: string }[] = [
   { id: "overview", label: "Overview" },
@@ -216,6 +247,18 @@ export default function App() {
     | undefined;
   const efficiencyDeltas = cardiacPreview?.sports ?? [];
 
+  // Which page the assistant should answer from. Derived from the same route
+  // state that decides what is rendered, so the two can never disagree --
+  // the most specific thing on screen wins, since that is what a question
+  // asked there is about.
+  const chatPage: ChatPage = useMemo(() => {
+    if (showAdmin) return "admin";
+    if (openRead) return "read";
+    if (runwayOpen) return "runway";
+    if (isMobile) return mobileTab === "today" ? "today" : mobileTab;
+    return section;
+  }, [showAdmin, openRead, runwayOpen, isMobile, mobileTab, section]);
+
   const setMobileTabAndClear = (next: MobileTab) => {
     setMobileTab(next);
     setOpenRead(null);
@@ -250,6 +293,7 @@ export default function App() {
 
   if (isMobile) {
     return (
+      <WithChat page={chatPage} readId={openRead} rangeDays={rangeDays}>
       <MobileShell
         tab={mobileTab}
         onTab={setMobileTabAndClear}
@@ -299,10 +343,12 @@ export default function App() {
           />
         )}
       </MobileShell>
+      </WithChat>
     );
   }
 
   return (
+    <WithChat page={chatPage} readId={openRead} rangeDays={rangeDays}>
     <div className="app">
       <aside className="sidebar">
         <div className="brand">
@@ -406,6 +452,13 @@ export default function App() {
                 Max HR {data.profile.body_measurement.max_heart_rate} bpm
               </div>
             )}
+            {/* Top-level entry point, so the assistant is one click away from
+                the header of whichever section is showing. */}
+            <AskButton
+              question="What stands out in my data today, and what should I do about it?"
+              label="Ask about this page"
+              send
+            />
           </div>
         </header>
 
@@ -452,7 +505,11 @@ export default function App() {
             />
 
             {reads.length > 0 ? (
-              <Section id="derived-charts" title="Load and rhythm">
+              <Section
+              id="derived-charts"
+              title="Load and rhythm"
+              ask="What do my load and rhythm reads say about how I am training?"
+            >
                 {readById("cardiac_efficiency") ? (
                   <CardiacEfficiencyPreview
                     read={readById("cardiac_efficiency") as DerivedRead}
@@ -480,17 +537,29 @@ export default function App() {
               </Section>
             ) : null}
 
-            <Section id="recovery" title="Recovery">
+            <Section
+              id="recovery"
+              title="Recovery"
+              ask="Why is my recovery where it is, and what is driving my HRV and resting heart rate?"
+            >
               <RecoveryChart records={recovery} />
               <HrvRhrChart records={recovery} />
             </Section>
 
-            <Section id="strain" title="Strain">
+            <Section
+              id="strain"
+              title="Strain"
+              ask="Is my training load sustainable right now, and how is strain showing up in my recovery?"
+            >
               <StrainChart records={cycles} />
               <StrainVsRecovery records={daily} />
             </Section>
 
-            <Section id="sleep" title="Sleep">
+            <Section
+              id="sleep"
+              title="Sleep"
+              ask="How is my sleep affecting my recovery, and how bad is my sleep debt?"
+            >
               <SleepTrendsChart records={sleep} />
               <SleepStagesChart stages={data.sleepStages} />
               <SleepVsRecoveryChart
@@ -501,7 +570,11 @@ export default function App() {
               <SleepDetailTable records={sleep} />
             </Section>
 
-            <Section id="workouts" title="Workouts">
+            <Section
+              id="workouts"
+              title="Workouts"
+              ask="Which sports cost me the most recovery, and am I training often enough?"
+            >
               <WorkoutFrequencyChart workouts={workouts} />
               <StrainBySportChart
                 sports={data.sports}
@@ -512,9 +585,7 @@ export default function App() {
 
             {reads.length > 0 ? <ReadsTable reads={reads} onOpen={setOpenRead} /> : null}
 
-            <footer className="page-footer">
-              Thaalam · React + FastAPI · data stays on your machine
-            </footer>
+            <PageFooter />
               </>
             )}
           </>
@@ -525,6 +596,27 @@ export default function App() {
       </main>
       )}
     </div>
+    </WithChat>
+  );
+}
+
+
+/**
+ * The footer's privacy line, which has to tell the truth about the install it
+ * is running in. With the assistant off nothing leaves the machine but WHOOP
+ * traffic; with it on, asking a question sends that page's metrics to
+ * OpenRouter, and the footer says so rather than keeping a claim that has
+ * stopped being true.
+ */
+function PageFooter() {
+  const { enabled } = useChat();
+  return (
+    <footer className="page-footer">
+      Thaalam · React + FastAPI ·{" "}
+      {enabled
+        ? "your data stays on your machine, except the page metrics sent to OpenRouter when you ask the assistant"
+        : "data stays on your machine"}
+    </footer>
   );
 }
 
