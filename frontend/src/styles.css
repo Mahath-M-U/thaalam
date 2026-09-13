@@ -1910,7 +1910,7 @@ code {
   bottom: 0;
   z-index: 30;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   background: var(--canvas);
   border-top: 1px solid #1f1f1f;
   padding: 0.35rem 0.4rem calc(0.45rem + env(safe-area-inset-bottom));
@@ -3268,4 +3268,310 @@ code {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Headline scores — three derived scores abreast.
+
+   Not three rings. The three scales are different kinds of quantity (0-100,
+   0-10 days, 0-1 index), so each gets its own instrument and the row reads as
+   an instrument panel rather than a set of matching dials. Hairline rules
+   between columns, numerals doing the work, in the same editorial dark/amber
+   system as the rest of the dashboard.
+--------------------------------------------------------------------------- */
+
+.headline {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  background: var(--surface-card);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.headline.is-empty {
+  display: block;
+  padding: 22px 20px;
+}
+
+.headline-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.headline-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 20px 18px 18px;
+  background: none;
+  border: 0;
+  border-left: 1px solid var(--hairline);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+
+.headline-col:first-child {
+  border-left: 0;
+}
+
+.headline-col:hover,
+.headline-col:focus-visible {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.headline-col:focus-visible {
+  outline: 2px solid var(--amber-60);
+  outline-offset: -2px;
+}
+
+.headline-kicker {
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.headline-figure {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.headline-figure strong {
+  font-size: 2.6rem;
+  line-height: 1;
+  font-weight: 500;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.headline-figure em {
+  font-style: normal;
+  font-size: 0.72rem;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+.headline-col.is-calibrating .headline-figure strong {
+  color: var(--muted-soft);
+}
+
+.headline-state {
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--body);
+}
+
+.headline-delta {
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  color: var(--amber);
+  font-variant-numeric: tabular-nums;
+}
+
+.headline-delta.down {
+  color: var(--muted);
+}
+
+/* ---- Rails: one instrument per scale ---- */
+
+.rail {
+  display: block;
+  width: 100%;
+}
+
+.rail-track {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--chrome);
+  overflow: hidden;
+}
+
+.rail-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--amber);
+  border-radius: var(--radius-pill);
+  transition: width 260ms ease;
+}
+
+.rail-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--canvas);
+  opacity: 0.85;
+}
+
+/* 0-10 days: counted, so the instrument counts. */
+.rail-pips {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.rail-pips .pip {
+  flex: 1;
+  height: 6px;
+  border-radius: 2px;
+  background: var(--chrome);
+}
+
+.rail-pips .pip.is-lit {
+  background: var(--amber);
+}
+
+/* Holding — no projected crossing — is the best state, so it reads full
+   with an open cap rather than as an empty or missing gauge. */
+.rail-pips.is-holding .pip {
+  background: var(--amber-60);
+}
+
+.rail-pips .pip-cap {
+  color: var(--amber);
+  font-size: 0.9rem;
+  line-height: 1;
+  margin-left: 1px;
+}
+
+/* 0-1: a position on an index, so neither end is a fill. */
+.rail-index .rail-track {
+  overflow: visible;
+}
+
+.rail-index .rail-mid {
+  position: absolute;
+  left: 50%;
+  top: -2px;
+  bottom: -2px;
+  width: 1px;
+  background: var(--hairline);
+}
+
+.rail-index .rail-marker {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  border-radius: 50%;
+  background: var(--amber);
+  transform: translateY(-50%);
+  transition: left 260ms ease;
+}
+
+/* Stay abreast on a phone -- three scores side by side is the whole point of
+   the row, so the type shrinks rather than the columns stacking. The state
+   line is what gives way: mobile renders the panel compact and the daily
+   brief underneath carries the narrative. */
+@media (max-width: 720px) {
+  .headline-col {
+    gap: 8px;
+    padding: 14px 10px 12px;
+  }
+
+  /* Two of the three titles wrap at phone width. Reserving both lines for
+     all three keeps the numerals on one baseline across the row, which is
+     the whole point of setting them abreast. */
+  .headline-kicker {
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    min-height: 2.1em;
+  }
+
+  .headline-figure {
+    gap: 4px;
+  }
+
+  .headline-figure strong {
+    font-size: 1.9rem;
+  }
+
+  .headline-figure em {
+    font-size: 0.62rem;
+  }
+
+  .headline-state {
+    font-size: 0.74rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .headline-delta {
+    font-size: 0.66rem;
+  }
+
+  .rail-pips {
+    gap: 2px;
+  }
+}
+
+/* The narrowest phones: the denominator is the first thing to go, since the
+   kicker already names the score and the rail already shows the scale. */
+@media (max-width: 400px) {
+  .headline-col {
+    padding: 12px 7px 10px;
+  }
+
+  .headline-figure strong {
+    font-size: 1.6rem;
+  }
+
+  .headline-figure em {
+    display: none;
+  }
+}
+
+.whoop-tab-note {
+  margin: 0 0 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--chrome);
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+/* A non-Today tab on mobile: the headline strip, then that tab's own body.
+   `.mobile-body` already carries the page gutters and the nav clearance. */
+.mobile-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+}
+
+.mobile-tab .section {
+  margin: 0;
+}
+
+/* Five tabs instead of three, so the labels take the room back from the
+   padding rather than from each other, and never wrap the bar to two rows. */
+.bottom-nav button {
+  min-width: 0;
+  padding-left: 0.1rem;
+  padding-right: 0.1rem;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bottom-nav button svg {
+  width: 20px;
+  height: 20px;
 }

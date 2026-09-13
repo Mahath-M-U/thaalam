@@ -1,12 +1,23 @@
-import { useEffect, useRef, useState } from "react";
-import type { DailyBriefResponse, DerivedRead, RunwayResponse, VitalityResponse } from "../../types";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import type {
+  DailyBriefResponse,
+  DerivedRead,
+  HeadlineResponse,
+  TabId,
+  VitalityResponse,
+} from "../../types";
 import { rewriteTriScaleCopy } from "../../utils";
 import { AskButton } from "../chat/AskButton";
+import { HeadlineScores } from "../HeadlineScores";
 import { Sparkline } from "../ReadsTable";
-import { RunwayCard } from "../RunwayCard";
 import { ScoreMeters } from "../ScoreRingCard";
-import { ScoreRing, VitalityDeepDive } from "../VitalityDeepDive";
+import { ScoreRing } from "../ScoreRing";
 import { WhoopConnectionPanel } from "../WhoopConnectionPanel";
+
+// The dive is recharts; Today is not. Loaded when one is actually opened.
+const VitalityDeepDive = lazy(() =>
+  import("../VitalityDeepDive").then((m) => ({ default: m.VitalityDeepDive })),
+);
 
 const SIGNAL_IDS = [
   "restorative_yield",
@@ -18,11 +29,11 @@ const SIGNAL_IDS = [
 interface Props {
   vitality: VitalityResponse;
   brief: DailyBriefResponse | null;
+  headline: HeadlineResponse | null;
   reads: DerivedRead[];
-  runway: RunwayResponse | null;
   onOpenRead: (id: string) => void;
+  onOpenTab: (tab: TabId) => void;
   onOpenReads: () => void;
-  onOpenRunway: () => void;
   onRefresh: () => void;
   syncing: boolean;
   syncError?: string | null;
@@ -35,11 +46,11 @@ interface Props {
 export function TodayView({
   vitality,
   brief,
+  headline,
   reads,
-  runway,
   onOpenRead,
+  onOpenTab,
   onOpenReads,
-  onOpenRunway,
   onRefresh,
   syncing,
   syncError,
@@ -136,6 +147,8 @@ export function TodayView({
         </div>
       </header>
 
+      <HeadlineScores headline={headline} onOpenTab={onOpenTab} compact />
+
       <section className={`today-score${vitality.sleep_not_closed ? " dimmed" : ""}`}>
         <div className="today-score-top">
           <button
@@ -186,15 +199,6 @@ export function TodayView({
           />
         </div>
       </article>
-
-      {runway ? (
-        <RunwayCard runway={runway} onOpen={onOpenRunway} compact />
-      ) : (
-        <article className="runway-card is-compact">
-          <div className="runway-kicker">Recovery sustainability runway</div>
-          <p className="runway-calibrating">Calibrating the runway from your own nights.</p>
-        </article>
-      )}
 
       {signals.length > 0 ? (
         <section className="today-signals">
@@ -259,7 +263,9 @@ export function TodayView({
       </button>
 
       {vitalityOpen ? (
-        <VitalityDeepDive vitality={vitality} onClose={() => setVitalityOpen(false)} />
+        <Suspense fallback={null}>
+          <VitalityDeepDive vitality={vitality} onClose={() => setVitalityOpen(false)} />
+        </Suspense>
       ) : null}
     </div>
   );

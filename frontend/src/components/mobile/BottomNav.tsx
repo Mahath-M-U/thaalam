@@ -1,14 +1,16 @@
-import type { MobileTab } from "../../types";
+import type { TabId } from "../../types";
 
-const TABS: { id: MobileTab; label: string; home?: boolean }[] = [
+const TABS: { id: TabId; label: string; home?: boolean }[] = [
   { id: "today", label: "Today", home: true },
-  { id: "reads", label: "Reads" },
-  { id: "runway", label: "Runway" },
+  { id: "sleep", label: "Sleep" },
+  { id: "load", label: "Load" },
+  { id: "rhythm", label: "Rhythm" },
+  { id: "whoop", label: "WHOOP" },
 ];
 
 interface Props {
-  tab: MobileTab;
-  onTab: (tab: MobileTab) => void;
+  tab: TabId;
+  onTab: (tab: TabId) => void;
   hidden?: boolean;
 }
 
@@ -35,7 +37,7 @@ export function BottomNav({ tab, onTab, hidden = false }: Props) {
   );
 }
 
-function TabIcon({ id }: { id: MobileTab }) {
+function TabIcon({ id }: { id: TabId }) {
   if (id === "today") {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -49,11 +51,12 @@ function TabIcon({ id }: { id: MobileTab }) {
       </svg>
     );
   }
-  if (id === "reads") {
+  if (id === "sleep") {
+    // Crescent: the sleep group.
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path
-          d="M7 5.5h10.5A1.5 1.5 0 0 1 19 7v12.2L12 16.4 5 19.2V7A1.5 1.5 0 0 1 6.5 5.5H7Z"
+          d="M19.4 14.6A7.6 7.6 0 0 1 9.4 4.6a7.6 7.6 0 1 0 10 10Z"
           fill="none"
           stroke="currentColor"
           strokeWidth="1.8"
@@ -62,10 +65,42 @@ function TabIcon({ id }: { id: MobileTab }) {
       </svg>
     );
   }
+  if (id === "load") {
+    // Rising trace: the load group.
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M4 16.6 9 11l3.4 3.4L20 6.9"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path d="M15.4 6.9H20v4.6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  if (id === "rhythm") {
+    // Clock: the rhythm group.
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="7.25" fill="none" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M12 8.2v4.1l2.7 1.6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  // Layers: the raw WHOOP series kept underneath everything else.
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="7.25" fill="none" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M12 8.2v4.1l2.7 1.6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path
+        d="M12 4.4 4.6 8.2 12 12l7.4-3.8L12 4.4Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path d="m4.6 12.6 7.4 3.8 7.4-3.8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
     </svg>
   );
 }

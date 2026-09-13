@@ -1,6 +1,11 @@
-import { useState } from "react";
+import { Suspense, lazy, useState } from "react";
 import type { VitalityPart, VitalityResponse, VitalitySupporting } from "../types";
-import { ScoreRing, VitalityDeepDive } from "./VitalityDeepDive";
+import { ScoreRing } from "./ScoreRing";
+
+// The dive is recharts; the card is not. Loaded when one is actually opened.
+const VitalityDeepDive = lazy(() =>
+  import("./VitalityDeepDive").then((m) => ({ default: m.VitalityDeepDive })),
+);
 
 interface Props {
   vitality: VitalityResponse;
@@ -99,7 +104,9 @@ export function ScoreRingCard({ vitality }: Props) {
       </article>
 
       {diveOpen && (
-        <VitalityDeepDive vitality={vitality} onClose={() => setDiveOpen(false)} />
+        <Suspense fallback={null}>
+          <VitalityDeepDive vitality={vitality} onClose={() => setDiveOpen(false)} />
+        </Suspense>
       )}
     </>
   );
