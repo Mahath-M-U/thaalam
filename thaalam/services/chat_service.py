@@ -10,14 +10,15 @@ from __future__ import annotations
 import logging
 import time
 from collections import deque
-from dataclasses import dataclass
+from collections.abc import Iterator
+from dataclasses import dataclass, field
 from threading import Lock
 
 import duckdb
 
 from thaalam.config import get_settings
 from thaalam.services import chat_context
-from thaalam.services.llm_client import ChatUnavailable, complete
+from thaalam.services.llm_client import ChatUnavailable, StreamEvent, complete, stream
 
 logger = logging.getLogger(__name__)
 
@@ -129,19 +130,24 @@ def build_messages(context: chat_context.ChatContext, turns: list[Turn]) -> list
     ]
 
 
-def answer(
+def _prepare(
     con: duckdb.DuckDBPyConnection | None,
     *,
     turns: list[Turn] | list[dict],
     account: str,
-    page: str | None = None,
-    read_id: str | None = None,
-    range_days: int | None = None,
-) -> ChatAnswer:
-    """Answer the last turn in `turns`, grounded in what `page` is showing.
+    page: str | None,
+    read_id: str | None,
+    range_days: int | None,
+) -> tuple[chat_context.ChatContext, list[dict[str, str]]]:
+    """Everything that has to happen before a model is called.
 
-    Raises `ChatUnavailable` (which carries the HTTP status to use) when the
-    assistant is unconfigured, throttled, or upstream cannot answer.
+    Shared by the buffered and streamed paths, and deliberately complete: by
+    the time this returns, the request has been validated, the account's
+    allowance has been spent, and the grounding block has been read out of
+    DuckDB. That ordering is what lets the streaming route answer a refusal
+    with a real HTTP status -- and it means the database connection is
+    finished with before the first token, rather than being held open for the
+    length of a model's reply.
     """
     settings = get_settings()
     if not settings.chat_configured:
@@ -161,7 +167,32 @@ def answer(
     _check_quota(account)
 
     context = chat_context.build_context(con, page=page, read_id=read_id, range_days=range_days)
-    result = complete(build_messages(context, cleaned))
+    return context, build_messages(context, cleaned)
+
+
+def answer(
+    con: duckdb.DuckDBPyConnection | None,
+    *,
+    turns: list[Turn] | list[dict],
+    account: str,
+    page: str | None = None,
+    read_id: str | None = None,
+    range_days: int | None = None,
+) -> ChatAnswer:
+    """Answer the last turn in `turns`, grounded in what `page` is showing.
+
+    Raises `ChatUnavailable` (which carries the HTTP status to use) when the
+    assistant is unconfigured, throttled, or upstream cannot answer.
+    """
+    context, messages = _prepare(
+        con,
+        turns=turns,
+        account=account,
+        page=page,
+        read_id=read_id,
+        range_days=range_days,
+    )
+    result = complete(messages)
 
     logger.info(
         "Chat answered on page=%s model=%s grounded_on=%s",
@@ -176,4 +207,71 @@ def answer(
         grounded_on=context.grounded_on,
         ready=context.ready,
         usage=result.usage,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Streamed answers
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class ChatStream:
+    """A streamed answer: what it is grounded in, then the text as it lands.
+
+    The grounding is separated from the events on purpose. It is known before
+    the model is called, so the dock can render the header of an answer -- the
+    page it is about, whether there is any synced history behind it -- while
+    the first token is still in flight.
+    """
+
+    page: str
+    grounded_on: list[str]
+    ready: bool
+    events: Iterator[StreamEvent] = field(default_factory=lambda: iter(()))
+
+
+def stream_answer(
+    con: duckdb.DuckDBPyConnection | None,
+    *,
+    turns: list[Turn] | list[dict],
+    account: str,
+    page: str | None = None,
+    read_id: str | None = None,
+    range_days: int | None = None,
+) -> ChatStream:
+    """Start a streamed answer to the last turn in `turns`.
+
+    Raises `ChatUnavailable` before returning for everything knowable up front
+    -- an unconfigured server, an empty question, a spent allowance, a free
+    tier with nothing available -- so those still reach the browser as an HTTP
+    status rather than as a failure inside a 200.
+    """
+    context, messages = _prepare(
+        con,
+        turns=turns,
+        account=account,
+        page=page,
+        read_id=read_id,
+        range_days=range_days,
+    )
+    events = stream(messages)
+
+    def _tracked() -> Iterator[StreamEvent]:
+        """Pass events through, logging the one that names the model used."""
+        for event in events:
+            if event.kind == "start":
+                logger.info(
+                    "Chat streaming on page=%s model=%s grounded_on=%s",
+                    context.page,
+                    event.model,
+                    ",".join(context.grounded_on) or "none",
+                )
+            yield event
+
+    return ChatStream(
+        page=context.page,
+        grounded_on=context.grounded_on,
+        ready=context.ready,
+        events=_tracked(),
     )

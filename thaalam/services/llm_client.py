@@ -27,8 +27,10 @@ candidate is tried, so one dead slug doesn't take the feature down.
 
 from __future__ import annotations
 
+import json
 import logging
 import time
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from threading import Lock
 from typing import Any
@@ -435,6 +437,320 @@ def complete(
             _bench(slug, seconds=120)
     finally:
         if owned_session:
+            session.close()
+
+    if rate_limited:
+        raise ChatUnavailable(
+            "The free model tier is rate-limited right now. Try again in a few minutes.",
+            status=429,
+            retry_after=retry_after or 60,
+        )
+    raise ChatUnavailable(
+        f"No free model could answer right now ({last_detail or 'unknown error'}).",
+        status=503,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Streaming completion
+# ---------------------------------------------------------------------------
+#
+# Same walk over the same candidates as `complete`, with one constraint that
+# changes the shape of the code: once a token has been handed to the caller it
+# is already on its way to the browser, so the model that produced it can no
+# longer be swapped out. Everything below is therefore written around a single
+# commitment point -- the first token. Before it, a failure is just another
+# retired slug; after it, the answer stands with whatever it managed to say.
+
+
+@dataclass
+class StreamEvent:
+    """One step of a streamed answer.
+
+    ``start`` lands once, when a model has actually produced text: that is the
+    moment the choice becomes final. ``delta`` carries the text as it arrives.
+    ``end`` closes the answer and reports what it cost -- its ``error`` is set
+    only when the connection dropped mid-sentence, which leaves the partial
+    text standing rather than replacing a half-useful answer with a failure.
+    """
+
+    kind: str
+    text: str = ""
+    model: str = ""
+    usage: dict[str, Any] = field(default_factory=dict)
+    attempted: list[str] = field(default_factory=list)
+    error: str = ""
+
+
+class _StreamRejected(Exception):
+    """An error OpenRouter reported inside the stream instead of as a status.
+
+    A rate limit or a retired model can arrive either way depending on where
+    upstream noticed it, so this is normalised back into the same branch the
+    status codes take.
+    """
+
+    def __init__(self, detail: str, *, code: int | None = None) -> None:
+        super().__init__(detail)
+        self.detail = detail
+        self.code = code
+
+
+def _iter_sse_data(response: requests.Response) -> Iterator[dict[str, Any]]:
+    """Yield the JSON objects out of an ``text/event-stream`` body.
+
+    The wire format is `data: {...}` frames closed by `data: [DONE]`, plus
+    `: ...` comment lines that OpenRouter sends purely to stop an intermediary
+    from closing an idle connection while a model is still thinking. Lines are
+    decoded one at a time, which is safe because a line break can never fall
+    inside a UTF-8 sequence.
+    """
+    for raw in response.iter_lines():
+        if not raw:
+            continue
+        line = raw.decode("utf-8", "replace") if isinstance(raw, bytes) else str(raw)
+        line = line.strip()
+        # Comments are keepalives, and anything that is not a data frame
+        # (`event:`, `id:`, `retry:`) carries nothing this client needs.
+        if not line or not line.startswith("data:"):
+            continue
+        payload = line[len("data:") :].strip()
+        if payload == "[DONE]":
+            return
+        try:
+            parsed = json.loads(payload)
+        except ValueError:
+            # A truncated frame is not worth failing an answer over.
+            continue
+        if isinstance(parsed, dict):
+            yield parsed
+
+
+def _delta_text(chunk: dict[str, Any]) -> str:
+    """The text a streamed chunk adds, if any.
+
+    Chunks with no content are routine: the first usually carries only the
+    role, the last only a finish reason, and some providers interleave a
+    `reasoning` field that is deliberately ignored here.
+    """
+    choices = chunk.get("choices")
+    if not isinstance(choices, list) or not choices:
+        return ""
+    first = choices[0]
+    if not isinstance(first, dict):
+        return ""
+    delta = first.get("delta")
+    if not isinstance(delta, dict):
+        return ""
+    content = delta.get("content")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(p.get("text", "") for p in content if isinstance(p, dict))
+    return ""
+
+
+def stream(
+    messages: list[dict[str, str]],
+    *,
+    max_tokens: int | None = None,
+    temperature: float = 0.3,
+    session: requests.Session | None = None,
+) -> Iterator[StreamEvent]:
+    """Stream an answer from the best free model that will take `messages`.
+
+    Raises `ChatUnavailable` straight away -- before any event -- when the
+    assistant is switched off or every candidate is cooling down, so the API
+    route can still answer with a real HTTP status instead of a 200 that
+    immediately reports failure. Anything that goes wrong once the walk is
+    under way is reported through the returned iterator.
+    """
+    settings = get_settings()
+    if not settings.chat_configured:
+        raise ChatUnavailable(
+            "The assistant is not configured. Set OPENROUTER_API_KEY to enable it.",
+            status=503,
+        )
+
+    owned_session = session is None
+    session = session or requests.Session()
+
+    now = time.monotonic()
+    candidates = [slug for slug in available_models(session) if not _benched(slug, now=now)]
+    if not candidates:
+        if owned_session:
+            session.close()
+        raise ChatUnavailable(
+            "The free model tier is busy right now. Try again in a few minutes.",
+            status=429,
+            retry_after=60,
+        )
+
+    return _stream_events(
+        session,
+        candidates[:_MAX_ATTEMPTS],
+        messages,
+        settings=settings,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        close_session=owned_session,
+    )
+
+
+def _stream_events(
+    session: requests.Session,
+    candidates: list[str],
+    messages: list[dict[str, str]],
+    *,
+    settings: Any,
+    max_tokens: int | None,
+    temperature: float,
+    close_session: bool,
+) -> Iterator[StreamEvent]:
+    url = f"{settings.openrouter_base_url.rstrip('/')}/chat/completions"
+    headers = _headers(settings)
+
+    attempted: list[str] = []
+    last_detail = ""
+    rate_limited = False
+    retry_after: int | None = None
+
+    try:
+        for slug in candidates:
+            body = {
+                "model": slug,
+                "messages": messages,
+                "max_tokens": max_tokens or settings.chat_max_tokens,
+                "temperature": temperature,
+                "stream": True,
+            }
+            try:
+                response = session.post(
+                    url,
+                    json=body,
+                    headers=headers,
+                    timeout=settings.chat_timeout_seconds,
+                    stream=True,
+                )
+            except requests.Timeout:
+                last_detail = "the model did not respond in time"
+                logger.warning("OpenRouter timeout opening a stream on %s", slug)
+                attempted.append(slug)
+                _bench(slug, seconds=60)
+                continue
+            except requests.RequestException as exc:
+                raise ChatUnavailable(
+                    "Could not reach the assistant service. Check the server's "
+                    "network access and try again.",
+                    status=503,
+                ) from exc
+
+            if response.status_code != 200:
+                detail = _error_detail(response)
+                status = response.status_code
+                header_retry = _retry_after(response)
+                response.close()
+                last_detail = detail
+                attempted.append(slug)
+
+                if status in (401, 403):
+                    logger.error("OpenRouter rejected the API key: %s", detail)
+                    raise ChatUnavailable(
+                        "The assistant's API key was rejected. Check OPENROUTER_API_KEY.",
+                        status=503,
+                    )
+                if status == 429:
+                    rate_limited = True
+                    retry_after = retry_after or header_retry
+                    _bench(slug, seconds=retry_after or _MODEL_COOLDOWN_SECONDS)
+                    logger.info("OpenRouter rate-limited %s: %s", slug, detail)
+                    continue
+                if status in (400, 404):
+                    _bench(slug)
+                    logger.info("Retiring OpenRouter model %s: %s", slug, detail)
+                    continue
+
+                logger.warning("OpenRouter error %s on %s: %s", status, slug, detail)
+                _bench(slug, seconds=120)
+                continue
+
+            produced = False
+            usage: dict[str, Any] = {}
+            try:
+                for chunk in _iter_sse_data(response):
+                    error = chunk.get("error")
+                    if isinstance(error, dict):
+                        code = error.get("code")
+                        raise _StreamRejected(
+                            str(error.get("message") or error)[:200],
+                            code=code if isinstance(code, int) else None,
+                        )
+                    chunk_usage = chunk.get("usage")
+                    if isinstance(chunk_usage, dict) and chunk_usage:
+                        usage = chunk_usage
+                    text = _delta_text(chunk)
+                    if not text:
+                        continue
+                    if not produced:
+                        produced = True
+                        if attempted:
+                            logger.info(
+                                "OpenRouter streamed from %s after skipping %s", slug, attempted
+                            )
+                        yield StreamEvent(kind="start", model=slug, attempted=list(attempted))
+                    yield StreamEvent(kind="delta", text=text)
+            except _StreamRejected as rejected:
+                last_detail = rejected.detail
+                if produced:
+                    # Too late to try anyone else; the user keeps what arrived.
+                    logger.warning("OpenRouter ended %s mid-answer: %s", slug, rejected.detail)
+                    yield StreamEvent(
+                        kind="end",
+                        model=slug,
+                        usage=usage,
+                        attempted=list(attempted),
+                        error="The answer stopped early. Ask again for the rest.",
+                    )
+                    return
+                attempted.append(slug)
+                if rejected.code == 429:
+                    rate_limited = True
+                    _bench(slug)
+                    logger.info("OpenRouter rate-limited %s mid-stream: %s", slug, rejected.detail)
+                else:
+                    _bench(slug)
+                    logger.info("Retiring OpenRouter model %s: %s", slug, rejected.detail)
+                continue
+            except requests.RequestException as exc:
+                if produced:
+                    logger.warning("OpenRouter stream from %s dropped: %s", slug, exc)
+                    yield StreamEvent(
+                        kind="end",
+                        model=slug,
+                        usage=usage,
+                        attempted=list(attempted),
+                        error="The connection dropped before the answer finished.",
+                    )
+                    return
+                last_detail = "the connection dropped before the answer started"
+                logger.warning("OpenRouter stream from %s failed to start: %s", slug, exc)
+                attempted.append(slug)
+                _bench(slug, seconds=60)
+                continue
+            finally:
+                response.close()
+
+            if not produced:
+                # A 200 that streamed nothing (content filter, zero-token
+                # truncation) is not worth retrying on the same model.
+                last_detail = "the model returned an empty answer"
+                attempted.append(slug)
+                continue
+
+            yield StreamEvent(kind="end", model=slug, usage=usage, attempted=list(attempted))
+            return
+    finally:
+        if close_session:
             session.close()
 
     if rate_limited:

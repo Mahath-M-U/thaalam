@@ -8,15 +8,24 @@ crafted request.
 
 `/api/chat/status` exists so the frontend can hide the dock entirely when no
 API key is configured, rather than offering a button that fails.
+
+Two ways to ask the same question. `POST /api/chat` answers in one piece and
+is the fallback; `POST /api/chat/stream` answers as the model writes, which is
+what the dock uses. Streaming is a POST rather than an `EventSource` GET for
+two reasons that both matter here: the conversation travels in a body, and a
+POST is what the CSRF check covers.
 """
 
 from __future__ import annotations
 
+import json
 import logging
+from collections.abc import Iterator
 from typing import Any, Literal
 
 import duckdb
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from thaalam.api.deps import get_optional_readonly_connection, require_user
@@ -125,3 +134,111 @@ def post_chat(
         "ready": answer.ready,
         "usage": answer.usage,
     }
+
+
+# ---------------------------------------------------------------------------
+# Streaming
+# ---------------------------------------------------------------------------
+
+#: Server-sent events, plus the two headers that stop an intermediary from
+#: holding the body back. Without `X-Accel-Buffering` nginx buffers a proxied
+#: response by default, which turns a streamed answer back into a slow one.
+_SSE_HEADERS = {
+    "Cache-Control": "no-cache, no-store, no-transform",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no",
+}
+
+
+def _frame(event: str, data: dict[str, Any]) -> str:
+    """One SSE frame.
+
+    `json.dumps` is what makes this safe to concatenate: it escapes newlines,
+    so model output can never close the frame early or forge another event.
+    """
+    return f"event: {event}\ndata: {json.dumps(data, separators=(',', ':'))}\n\n"
+
+
+@router.post("/stream")
+def post_chat_stream(
+    payload: ChatRequest,
+    user: AuthenticatedUser = Depends(require_user),
+    con: duckdb.DuckDBPyConnection | None = Depends(get_optional_readonly_connection),
+) -> StreamingResponse:
+    """Answer the latest question as the model writes it.
+
+    The same answer as `POST /api/chat`, delivered as it is produced. Events:
+
+    ``meta``   once, before the model is called -- the page the answer is
+               scoped to, what it is grounded in, and whether any history has
+               been synced. The dock renders an answer's frame from this while
+               the first token is still in flight.
+    ``start``  the model that committed to the answer.
+    ``delta``  ``{"text": "..."}``, appended in order.
+    ``done``   the end, with usage; ``error`` is set when the connection died
+               mid-answer, in which case the partial text above it stands.
+    ``error``  the answer could not be produced at all.
+
+    Anything knowable before the first byte -- no key, no allowance left, an
+    empty question -- is still an ordinary HTTP error, because a 200 that
+    immediately says "failed" is harder for a client to handle than a 429.
+    """
+    try:
+        streamed = chat_service.stream_answer(
+            con,
+            turns=[chat_service.Turn(role=t.role, content=t.content) for t in payload.messages],
+            account=user.email,
+            page=payload.page,
+            read_id=payload.read_id,
+            range_days=payload.range_days,
+        )
+    except ChatUnavailable as exc:
+        headers = {"Retry-After": str(exc.retry_after)} if exc.retry_after else None
+        raise HTTPException(status_code=exc.status, detail=str(exc), headers=headers) from exc
+
+    def frames() -> Iterator[str]:
+        yield _frame(
+            "meta",
+            {
+                "page": streamed.page,
+                "grounded_on": streamed.grounded_on,
+                "ready": streamed.ready,
+            },
+        )
+        try:
+            for event in streamed.events:
+                if event.kind == "start":
+                    yield _frame("start", {"model": event.model})
+                elif event.kind == "delta":
+                    yield _frame("delta", {"text": event.text})
+                elif event.kind == "end":
+                    yield _frame(
+                        "done",
+                        {
+                            "model": event.model,
+                            "usage": event.usage,
+                            "error": event.error,
+                        },
+                    )
+        except ChatUnavailable as exc:
+            # Upstream ran out of models after the response had already begun,
+            # so this cannot be a status code any more.
+            yield _frame(
+                "error",
+                {
+                    "detail": str(exc),
+                    "status": exc.status,
+                    "retry_after": exc.retry_after,
+                },
+            )
+        except Exception:  # pragma: no cover - defensive
+            # The generator runs outside the route's exception handling, so an
+            # unexpected failure here would otherwise truncate the body with
+            # no explanation at all.
+            logger.exception("Chat stream failed")
+            yield _frame(
+                "error",
+                {"detail": "The assistant stopped unexpectedly.", "status": 500},
+            )
+
+    return StreamingResponse(frames(), media_type="text/event-stream", headers=_SSE_HEADERS)
