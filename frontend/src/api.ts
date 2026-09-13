@@ -2,6 +2,8 @@ import type {
   BriefExplainerResponse,
   ChatReplyResponse,
   ChatStatusResponse,
+  ChatStreamDone,
+  ChatStreamMeta,
   ChatSuggestionsResponse,
   ChatTurn,
   CycleRecord,
@@ -87,6 +89,78 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
     return undefined as T;
   }
   return res.json() as Promise<T>;
+}
+
+/**
+ * Read a `text/event-stream` body, one frame at a time.
+ *
+ * Deliberately hand-rolled rather than `EventSource`: that only does GET, and
+ * the conversation has to travel in a POST body -- which is also what puts the
+ * request behind the CSRF check.
+ *
+ * A frame is `event: <name>` and `data: <json>` separated by a blank line, so
+ * the parse is a split on "\n\n" over a buffer that keeps whatever the last
+ * chunk left unterminated.
+ */
+async function readEventStream(
+  body: ReadableStream<Uint8Array>,
+  onFrame: (event: string, data: Record<string, unknown>) => void,
+): Promise<void> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      // `stream: true` matters: a token's UTF-8 bytes can straddle two chunks.
+      buffer += decoder.decode(value, { stream: true });
+
+      let boundary = buffer.indexOf("\n\n");
+      while (boundary !== -1) {
+        const block = buffer.slice(0, boundary);
+        buffer = buffer.slice(boundary + 2);
+        boundary = buffer.indexOf("\n\n");
+
+        let name = "message";
+        let data = "";
+        for (const line of block.split("\n")) {
+          if (line.startsWith("event:")) name = line.slice(6).trim();
+          else if (line.startsWith("data:")) data += line.slice(5).trim();
+          // Anything else is a comment keepalive or a field we do not use.
+        }
+        if (!data) continue;
+        try {
+          onFrame(name, JSON.parse(data) as Record<string, unknown>);
+        } catch {
+          /* a frame we cannot parse is not worth failing the answer over */
+        }
+      }
+    }
+  } finally {
+    // Releasing matters on abort: without it the socket stays half-open.
+    reader.releaseLock();
+  }
+}
+
+export interface ChatStreamHandlers {
+  /** Page scope and grounding, known before the model is called. */
+  onMeta?: (meta: ChatStreamMeta) => void;
+  /** The model that committed to the answer. */
+  onStart?: (model: string) => void;
+  /** Appended in order, as the model writes. */
+  onDelta: (text: string) => void;
+  /** The end. `error` set means the text above it is all there will be. */
+  onDone?: (done: ChatStreamDone) => void;
+}
+
+/** Thrown when the server has no streaming route, so the caller can fall back. */
+export class StreamUnsupported extends Error {
+  constructor() {
+    super("This server does not stream answers.");
+    this.name = "StreamUnsupported";
+  }
 }
 
 export interface CurrentUser {
@@ -227,6 +301,76 @@ export const api = {
       body: JSON.stringify(body),
       signal,
     }),
+
+  // The same question, answered as the model writes it. Resolves when the
+  // answer is complete; rejects with `ApiError` if the request is refused
+  // before the stream starts, or if it fails partway with nothing shown yet.
+  // A refusal that arrives *inside* the stream (the free tier running dry
+  // mid-answer) is an `error` frame, and rejects the same way -- the caller
+  // keeps whatever `onDelta` already gave it.
+  chatStream: async (
+    body: {
+      messages: ChatTurn[];
+      page: string;
+      read_id?: string | null;
+      range_days?: number | null;
+    },
+    handlers: ChatStreamHandlers,
+    signal?: AbortSignal,
+  ): Promise<void> => {
+    const res = await fetch("/api/chat/stream", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+        [CSRF_HEADER]: readCookie(CSRF_COOKIE),
+      },
+      body: JSON.stringify(body),
+      credentials: "same-origin",
+      signal,
+    });
+
+    if (res.status === 404 || res.status === 405) {
+      // An older backend that only has the buffered route.
+      throw new StreamUnsupported();
+    }
+    if (!res.ok || !res.body) {
+      let detail = res.statusText;
+      try {
+        const parsed = await res.json();
+        detail = parsed.detail ?? JSON.stringify(parsed);
+      } catch {
+        /* ignore parse errors */
+      }
+      if (res.status === 401) onUnauthorized?.();
+      throw new ApiError(typeof detail === "string" ? detail : JSON.stringify(detail), res.status);
+    }
+
+    let failure: ApiError | null = null;
+    await readEventStream(res.body, (event, data) => {
+      switch (event) {
+        case "meta":
+          handlers.onMeta?.(data as unknown as ChatStreamMeta);
+          break;
+        case "start":
+          handlers.onStart?.(String(data.model ?? ""));
+          break;
+        case "delta":
+          if (typeof data.text === "string") handlers.onDelta(data.text);
+          break;
+        case "done":
+          handlers.onDone?.(data as unknown as ChatStreamDone);
+          break;
+        case "error":
+          failure = new ApiError(
+            String(data.detail ?? "The assistant could not answer."),
+            Number(data.status ?? 503),
+          );
+          break;
+      }
+    });
+    if (failure) throw failure;
+  },
 
   adminUsers: () => requestJson<AdminUser[]>("/api/admin/users"),
   adminCreateUser: (email: string, role: AdminUser["role"]) =>

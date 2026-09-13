@@ -516,3 +516,21 @@ export interface ChatTurn {
   role: "user" | "assistant";
   content: string;
 }
+
+/**
+ * The streamed form of the same answer, as `POST /api/chat/stream` delivers
+ * it. `meta` lands before the model is called, so the dock can render an
+ * answer's frame while the first token is still in flight.
+ */
+export interface ChatStreamMeta {
+  page: string;
+  grounded_on: string[];
+  ready: boolean;
+}
+
+export interface ChatStreamDone {
+  model: string;
+  usage: Record<string, number>;
+  /** Set when the connection died mid-answer; the text above it still stands. */
+  error?: string;
+}

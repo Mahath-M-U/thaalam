@@ -95,6 +95,7 @@ uv run run_api.py
 | GET | `/api/chat/status` | Whether the assistant is configured (never returns the key) |
 | GET | `/api/chat/suggestions` | Starter questions for one page |
 | POST | `/api/chat` | Page-aware assistant answer, grounded in your own data |
+| POST | `/api/chat/stream` | The same answer, streamed token by token (`text/event-stream`) |
 
 ## 4. Start the React dashboard
 
@@ -160,6 +161,10 @@ A chat dock sits on every page of the dashboard. Ask it about what you are
 looking at — "why is my recovery here?", "is this load sustainable?" — and it
 answers from **your own synced data** and the baselines computed from it.
 
+Answers **stream**: the text appears as the model writes it rather than after
+a ten-second pause, a caret marks the live edge, and the send button becomes a
+stop button that keeps whatever has been said so far.
+
 It is off unless you set an API key:
 
 ```bash
@@ -185,6 +190,20 @@ where the variable was passed but empty.
   estimate one. With no synced history it is told to say so.
 - Same disclaimer as the rest of the app: descriptive analytics on your own
   history, never medical advice or diagnosis.
+
+**How streaming behaves.** `POST /api/chat/stream` returns Server-Sent Events:
+`meta` (the page and grounding, sent before the model is called), `start` (the
+model that committed to the answer), `delta` (the text, in order), and `done`.
+Anything knowable before the first byte — no key configured, an empty question,
+the account's allowance spent — is still an ordinary HTTP status, so the dock
+can say "try again in three minutes" rather than opening an empty answer. A
+failure *after* the first token arrives cannot be a status any more, so it is a
+`done` carrying an `error`, and the partial answer stays on screen. The model
+walk that absorbs the free tier's rotation happens before the first token, for
+the same reason: once a word has reached the browser, the model that wrote it
+can no longer be swapped out. If a deployment sits behind a proxy that buffers
+responses, the route sets `X-Accel-Buffering: no`; a browser that cannot reach
+the streaming route at all falls back to `POST /api/chat`.
 
 **Free models, and why none is hardcoded.** The app uses OpenRouter's free
 tier. Which model slugs are free is decided by the upstream providers and
