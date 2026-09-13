@@ -49,6 +49,9 @@ PAGES: tuple[str, ...] = (
     "read",
     "runway",
     "today",
+    "load",
+    "rhythm",
+    "whoop",
     "admin",
 )
 
@@ -73,6 +76,9 @@ _PAGE_SECTIONS: dict[str, tuple[str, ...]] = {
     "workouts": ("training_load", "training_readiness", "strain_recovery_lag"),
     "today": ("hrv", "rhr", "training_load", "sleep_debt"),
     "runway": ("training_load", "sleep_debt", "recovery_zones"),
+    "load": ("training_load", "strain_recovery_lag", "training_readiness", "hrv", "rhr"),
+    "rhythm": ("weekday_patterns", "sleep_debt", "hrv"),
+    "whoop": ("recovery_zones", "sleep_debt", "training_load", "hrv", "rhr"),
     "reads": (),
     "read": (),
     "admin": (),
@@ -90,7 +96,10 @@ _PAGE_DESCRIPTION: dict[str, str] = {
     "reads": "the Reads list: the derived findings computed from this user's baseline",
     "read": "a single derived read, opened in detail",
     "runway": "the Runway view: how many days of current load the user's recovery supports",
-    "today": "the mobile Today view: vitality score, the daily brief and top reads",
+    "today": "the Today tab: the three headline scores, the daily brief and flagged reads",
+    "load": "the Load tab: training load, the recovery runway and how strain lands on recovery",
+    "rhythm": "the Rhythm tab: circadian phase, habit persistence and weekday patterns",
+    "whoop": "the From WHOOP tab: the raw WHOOP metrics the WHOOP app itself already shows",
     "admin": "the administration screens (accounts, sessions, audit log, system status)",
 }
 

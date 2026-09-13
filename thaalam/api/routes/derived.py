@@ -8,7 +8,7 @@ import duckdb
 from fastapi import APIRouter, Depends
 
 from thaalam.api.deps import get_readonly_connection, require_user
-from thaalam.db import get_derived_baseline, get_derived_runway
+from thaalam.db import get_derived_baseline, get_derived_headline, get_derived_runway
 from thaalam.services.runway_service import compute_runway
 
 # Applied at the router so a route added later is guarded by default.
@@ -72,3 +72,17 @@ def get_runway(
     if stored is not None:
         return stored
     return compute_runway(con)
+
+
+@router.get("/headline")
+def get_headline(
+    con: duckdb.DuckDBPyConnection = Depends(get_readonly_connection),
+) -> dict[str, Any]:
+    """The three headline scores. Stored by the nightly recompute; computed
+    on the spot when a client asks before the first one has run."""
+    from thaalam.services.headline_scores import compute_headline
+
+    stored = get_derived_headline(con)
+    if stored is not None:
+        return stored
+    return compute_headline(con)

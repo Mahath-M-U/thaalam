@@ -11,6 +11,7 @@ import type {
   DailyRecord,
   DerivedReadDiveResponse,
   DerivedReadsResponse,
+  HeadlineResponse,
   InsightsResponse,
   ProfileResponse,
   RecordsResponse,
@@ -274,6 +275,7 @@ export const api = {
   derivedReadDive: (id: string) =>
     requestJson<DerivedReadDiveResponse>(`/api/derived/reads/${encodeURIComponent(id)}`),
   derivedRunway: () => requestJson<RunwayResponse>("/api/derived/runway"),
+  derivedHeadline: () => requestJson<HeadlineResponse>("/api/derived/headline"),
 
   // The assistant. `chatStatus` is what decides whether the dock renders at
   // all, so an install with no OPENROUTER_API_KEY shows no chat button rather

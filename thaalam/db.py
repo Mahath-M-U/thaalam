@@ -251,6 +251,13 @@ _SCHEMA_STATEMENTS = [
         payload VARCHAR
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS derived_headline (
+        user_id BIGINT PRIMARY KEY,
+        computed_at TIMESTAMP,
+        payload VARCHAR
+    )
+    """,
 ]
 
 
@@ -780,6 +787,42 @@ def get_derived_runway(
     con: duckdb.DuckDBPyConnection, user_id: int | None = None
 ) -> dict[str, Any] | None:
     sql = "SELECT payload FROM derived_runway"
+    params: list[Any] = []
+    if user_id is not None:
+        sql += " WHERE user_id = ?"
+        params.append(user_id)
+    sql += " LIMIT 1"
+    row = con.execute(sql, params).fetchone()
+    if row is None or row[0] is None:
+        return None
+    payload = row[0]
+    if isinstance(payload, str):
+        try:
+            payload = json.loads(payload)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return None
+    return payload if isinstance(payload, dict) else None
+
+
+def upsert_derived_headline(
+    con: duckdb.DuckDBPyConnection,
+    user_id: int,
+    payload: dict[str, Any],
+    computed_at: datetime | None = None,
+) -> None:
+    stamped = computed_at or datetime.now(timezone.utc).replace(tzinfo=None)
+    _upsert(
+        con,
+        "derived_headline",
+        ["user_id", "computed_at", "payload"],
+        [(user_id, stamped, _as_json(payload))],
+    )
+
+
+def get_derived_headline(
+    con: duckdb.DuckDBPyConnection, user_id: int | None = None
+) -> dict[str, Any] | None:
+    sql = "SELECT payload FROM derived_headline"
     params: list[Any] = []
     if user_id is not None:
         sql += " WHERE user_id = ?"

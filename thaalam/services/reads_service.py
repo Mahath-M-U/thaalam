@@ -1567,6 +1567,7 @@ def _load_nights(con: duckdb.DuckDBPyConnection) -> list[dict[str, Any]]:
         awake = _hours(stage.get("total_awake_time_milli"))
         latency = _mins(_latency_milli(stage, needed, row))
         debt = _hours(needed.get("need_from_sleep_debt_milli"))
+        need = _total_need_hours(needed)
         midpoint = _sleep_midpoint_hours(start, end, row[4])
         date = None
         if end is not None:
@@ -1588,6 +1589,7 @@ def _load_nights(con: duckdb.DuckDBPyConnection) -> list[dict[str, Any]]:
             "asleep_hours": _sum_optional(rem, deep, light),
             "latency_min": latency,
             "debt_hours": debt,
+            "need_hours": need,
             "disturbances": _as_float(stage.get("disturbance_count")),
             "efficiency": _as_float(row[8]),
             "consistency": _as_float(row[7]),
@@ -1882,6 +1884,27 @@ def _parse_json(raw: Any) -> dict[str, Any] | None:
             return None
         return parsed if isinstance(parsed, dict) else None
     return None
+
+
+def _total_need_hours(needed: dict[str, Any]) -> float | None:
+    """Whole sleep need in hours: baseline plus the debt, strain and nap terms.
+
+    `_load_nights` already pulls the debt term out on its own; the total is
+    what a night's sleep is actually measured against, so the two live side
+    by side. The nap term is already negative in the WHOOP payload.
+    """
+    if not needed:
+        return None
+    parts = [
+        needed.get("baseline_milli"),
+        needed.get("need_from_sleep_debt_milli"),
+        needed.get("need_from_recent_strain_milli"),
+        needed.get("need_from_recent_nap_milli"),
+    ]
+    if all(part is None for part in parts):
+        return None
+    total = sum(_as_float(part) or 0.0 for part in parts)
+    return total / MS_PER_HOUR if total > 0 else None
 
 
 def _hours(value: Any) -> float | None:

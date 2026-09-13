@@ -134,6 +134,21 @@ def recompute(
             compute_and_store_reads(con, user_id=resolved_user_id, now=now)
         except Exception:
             logger.exception("Failed to compute derived reads")
+
+        # Last: the three headline scores read the reads, runway and vitality
+        # rows the steps above just stored. Its own try so a failure here
+        # cannot cost us the reads that did land.
+        try:
+            from thaalam.services.headline_scores import compute_headline
+
+            db.upsert_derived_headline(
+                con,
+                resolved_user_id,
+                compute_headline(con, now=now, user_id=resolved_user_id),
+                computed_at=now,
+            )
+        except Exception:
+            logger.exception("Failed to compute headline scores")
     else:
         logger.info("No profile user_id; derived baselines not stored")
 

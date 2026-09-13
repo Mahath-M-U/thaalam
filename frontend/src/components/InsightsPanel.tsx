@@ -37,19 +37,57 @@ const READ_ENTRY: Record<string, string> = {
   training_readiness: "adaptation_window",
 };
 
+/** The charts this panel can draw, keyed by their insights section. */
+export type InsightChartKey =
+  | "hrv"
+  | "training_load"
+  | "strain_recovery_lag"
+  | "recovery_zones"
+  | "weekday_patterns"
+  | "sleep_debt"
+  | "rolling";
+
 interface Props {
   insights: InsightsResponse;
-  dailyBrief: DailyBriefResponse;
+  dailyBrief?: DailyBriefResponse;
   rangeDays?: number;
   onOpenRead?: (id: string) => void;
+  /**
+   * Which charts and cards to draw. The tabs each show their own slice —
+   * omit both and you get the whole panel, which is what the single-page
+   * dashboard used to be.
+   */
+  charts?: InsightChartKey[];
+  cardIds?: string[];
+  id?: string;
+  title?: string;
+  ask?: string;
+  showBrief?: boolean;
+  showMeta?: boolean;
+  showDisclaimer?: boolean;
 }
 
-export function InsightsPanel({ insights, dailyBrief, rangeDays, onOpenRead }: Props) {
+export function InsightsPanel({
+  insights,
+  dailyBrief,
+  rangeDays,
+  onOpenRead,
+  charts,
+  cardIds,
+  id = "insights",
+  title = "Derived insights",
+  ask = "Which of these insights matters most for me right now, and what should I do about it?",
+  showBrief = true,
+  showMeta = true,
+  showDisclaimer = true,
+}: Props) {
+  const wants = (key: InsightChartKey) => charts == null || charts.includes(key);
+
   if (!insights.ready) {
     return (
-      <Section id="insights" title="Insights">
-        <DailyBriefCard brief={dailyBrief} />
-        <ChartCard title="Derived insights">
+      <Section id={id} title={title}>
+        {showBrief && dailyBrief ? <DailyBriefCard brief={dailyBrief} /> : null}
+        <ChartCard title={title}>
           <p className="empty-chart">
             {rewriteTriScaleCopy(insights.message) || "Not enough data yet."}
           </p>
@@ -90,14 +128,15 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays, onOpenRead }: P
       label: shortDate(r.date),
     }));
 
-  return (
-    <Section
-      id="insights"
-      title="Derived insights"
-      ask="Which of these insights matters most for me right now, and what should I do about it?"
-    >
-      <DailyBriefCard brief={dailyBrief} />
+  const cards = cardIds
+    ? insights.cards.filter((card) => cardIds.includes(card.id))
+    : insights.cards;
 
+  return (
+    <Section id={id} title={title} ask={ask}>
+      {showBrief && dailyBrief ? <DailyBriefCard brief={dailyBrief} /> : null}
+
+      {showMeta ? (
       <div className="insight-meta wide">
         <p>
           Built from <strong>{insights.generated_from_days}</strong> days
@@ -108,9 +147,10 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays, onOpenRead }: P
           WHOOP history.
         </p>
       </div>
+      ) : null}
 
       <div className="insight-cards wide">
-        {insights.cards.map((card) => {
+        {cards.map((card) => {
           const readId = READ_ENTRY[card.id];
           const clickable = Boolean(readId && onOpenRead);
           return (
@@ -140,7 +180,7 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays, onOpenRead }: P
         })}
       </div>
 
-      {hrvSeries.length > 0 && (
+      {wants("hrv") && hrvSeries.length > 0 && (
         <ChartCard
           title="HRV vs 30-day personal baseline"
           description="Single HRV readings mean more when compared to your own rolling baseline (±10–15% is notable)."
@@ -207,7 +247,7 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays, onOpenRead }: P
         </ChartCard>
       )}
 
-      {acwrSeries.length > 0 && (
+      {wants("training_load") && acwrSeries.length > 0 && (
         <ChartCard
           title="Training load ratio (acute 7d / chronic 28d)"
           description="ACWR-style ratio on day strain. Common bands: sweet spot ~0.8–1.3; spikes &gt;1.5 often flagged."
@@ -249,7 +289,7 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays, onOpenRead }: P
         </ChartCard>
       )}
 
-      {lagBuckets.length > 0 && (
+      {wants("strain_recovery_lag") && lagBuckets.length > 0 && (
         <ChartCard
           title="Next-day recovery by prior strain"
           description="All history · average recovery the day after low / medium / high strain."
@@ -283,7 +323,7 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays, onOpenRead }: P
         </ChartCard>
       )}
 
-      {zonePct && (
+      {wants("recovery_zones") && zonePct && (
         <ChartCard
           title="Recovery zone mix"
           description="All history · share of days by recovery score as an amber opacity ladder."
@@ -341,7 +381,7 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays, onOpenRead }: P
         </ChartCard>
       )}
 
-      {weekday.length > 0 && (
+      {wants("weekday_patterns") && weekday.length > 0 && (
         <ChartCard
           title="Weekday patterns"
           description={
@@ -407,7 +447,7 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays, onOpenRead }: P
         </ChartCard>
       )}
 
-      {sleepDebtSeries.length > 0 && (
+      {wants("sleep_debt") && sleepDebtSeries.length > 0 && (
         <ChartCard
           title="Sleep need vs time in bed"
           description="Debt-driven need from WHOOP sleep_needed, compared with in-bed time when available."
@@ -464,7 +504,7 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays, onOpenRead }: P
         </ChartCard>
       )}
 
-      {rolling.length > 0 && (
+      {wants("rolling") && rolling.length > 0 && (
         <ChartCard
           title="7-day rolling recovery & strain"
           description="Smoothed trends — weekly averages reduce day-to-day noise."
@@ -524,7 +564,7 @@ export function InsightsPanel({ insights, dailyBrief, rangeDays, onOpenRead }: P
         </ChartCard>
       )}
 
-      {insights.disclaimer && (
+      {showDisclaimer && insights.disclaimer && (
         <p className="insight-disclaimer wide">{rewriteTriScaleCopy(insights.disclaimer)}</p>
       )}
     </Section>

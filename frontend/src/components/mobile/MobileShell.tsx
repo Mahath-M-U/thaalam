@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import type { MobileTab } from "../../types";
+import type { TabId } from "../../types";
 import { WhoopConnectionPanel } from "../WhoopConnectionPanel";
 import { BottomNav } from "./BottomNav";
 
@@ -22,8 +22,8 @@ export function useIsMobile(query = MOBILE_QUERY): boolean {
 }
 
 interface Props {
-  tab: MobileTab;
-  onTab: (tab: MobileTab) => void;
+  tab: TabId;
+  onTab: (tab: TabId) => void;
   overlay?: ReactNode;
   children: ReactNode;
   hideNav?: boolean;

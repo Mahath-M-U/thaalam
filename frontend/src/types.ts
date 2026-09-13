@@ -147,15 +147,20 @@ export interface RecordsResponse<T> {
   records: T[];
 }
 
-export type SectionId =
-  | "overview"
-  | "insights"
-  | "recovery"
-  | "strain"
-  | "sleep"
-  | "workouts";
+/**
+ * The five tabs, shared by desktop and mobile.
+ *
+ * Three of them are a read group -- and each one is what a headline score on
+ * the Today strip opens. `whoop` is the quarantine: every metric the WHOOP
+ * app already shows you lives there and nowhere else.
+ */
+export type TabId = "today" | "sleep" | "load" | "rhythm" | "whoop";
 
-export type MobileTab = "today" | "reads" | "runway";
+/** Overlays reached from inside a tab rather than from the nav. */
+export type OverlayId = "reads" | "runway";
+
+export type SectionId = TabId;
+export type MobileTab = TabId;
 
 export interface InsightCard {
   id: string;
@@ -320,6 +325,49 @@ export interface VitalityResponse {
   cause: string;
   delta_14d: number | null;
   supporting: VitalitySupporting | null;
+}
+
+/**
+ * One headline score. The three do not share a scale on purpose: sleep
+ * quality is 0-100, the runway is 0-10 days, rhythm composition is 0-1.
+ * `scale` is the denominator to render, `decimals` how to print the numeral.
+ */
+export interface HeadlineContributor {
+  key: string | null;
+  name: string | null;
+  /** 0-1 where the contributor is scored; null where it is a share or note. */
+  sub: number | null;
+  actual: number | null;
+  unit: string | null;
+  note: string;
+}
+
+export interface HeadlineScore {
+  id: "sleep_quality" | "runway" | "rhythm_composition" | string;
+  title: string;
+  /** The tab this score opens. */
+  tab: TabId;
+  value: number | null;
+  scale: number;
+  decimals: number;
+  unit: string | null;
+  /** Runway only: no projected crossing, which is the best state, not an empty one. */
+  holding?: boolean;
+  state: string;
+  delta_14d: number | null;
+  calibrating: boolean;
+  progress: number | null;
+  progress_needed: number | null;
+  methodology: string;
+  contributors: HeadlineContributor[];
+}
+
+export interface HeadlineResponse {
+  present: boolean;
+  computed_at?: string;
+  nights: number;
+  calibrating: boolean;
+  scores: HeadlineScore[];
 }
 
 export type ReadGroup = "sleep" | "load" | "rhythm";
@@ -487,6 +535,9 @@ export type ChatPage =
   | "read"
   | "runway"
   | "today"
+  | "load"
+  | "rhythm"
+  | "whoop"
   | "admin";
 
 export interface ChatStatusResponse {
