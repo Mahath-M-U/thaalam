@@ -13,11 +13,14 @@ wheels/
 # Local WHOOP data (DuckDB database + cached OAuth token)
 data/
 
-# Working notes stay local. DEPLOYMENT.md is the exception: the README points
-# at it, so it has to exist in a fresh clone. A negation cannot re-include a
-# file under an excluded directory, hence docs/* rather than docs/.
+# Working notes stay local. Two files are the exception, because the README
+# points at them and they have to exist in a fresh clone: DEPLOYMENT.md, and
+# AGENT_PLAN.md, which is the agreed roadmap for the assistant rather than a
+# note to self. A negation cannot re-include a file under an excluded
+# directory, hence docs/* rather than docs/.
 docs/*
 !docs/DEPLOYMENT.md
+!docs/AGENT_PLAN.md
 
 # Frontend
 frontend/node_modules/
