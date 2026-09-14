@@ -329,7 +329,14 @@ def post_sync(
     finally:
         con.close()
         client.close()
-    return {"ok": True, "skipped": bool(result.get("skipped")), "records": result.get("records", 0)}
+    return {
+        "ok": True,
+        "skipped": bool(result.get("skipped")),
+        "records": result.get("records", 0),
+        # A historical import can outlast one day's WHOOP request budget, so
+        # say whether this run finished it or merely advanced it.
+        "importing_history": not result.get("history_complete", True),
+    }
 
 
 def _num(value: Any) -> float | int | None:

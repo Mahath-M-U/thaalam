@@ -134,6 +134,18 @@ _SCHEMA_STATEMENTS = [
         last_synced_at TIMESTAMP
     )
     """,
+    # Historical backfill progress, added after the original three columns --
+    # `ADD COLUMN IF NOT EXISTS` so databases created before full-history
+    # sync existed pick them up on the next connect.
+    #
+    # `backfill_cursor` is WHOOP's own `next_token` for the page after the
+    # last one stored, so a backfill interrupted by the daily request budget
+    # (or a restart) resumes there instead of re-walking years of pages.
+    'ALTER TABLE sync_state ADD COLUMN IF NOT EXISTS backfill_cursor VARCHAR',
+    'ALTER TABLE sync_state ADD COLUMN IF NOT EXISTS backfill_complete BOOLEAN',
+    'ALTER TABLE sync_state ADD COLUMN IF NOT EXISTS backfill_records BIGINT',
+    'ALTER TABLE sync_state ADD COLUMN IF NOT EXISTS backfill_started_at TIMESTAMP',
+    'ALTER TABLE sync_state ADD COLUMN IF NOT EXISTS backfill_finished_at TIMESTAMP',
     # Rule-based daily insight brief (see thaalam.services.brief_service) --
     # logged for history/audit (which rules fire most often), not a cache,
     # since generation is free/instant and re-run on every page load.
@@ -296,21 +308,37 @@ def _as_json(value: Any) -> str | None:
     return json.dumps(value) if value is not None else None
 
 
+_SYNC_STATE_COLUMNS = [
+    "high_water_mark",
+    "last_synced_at",
+    "backfill_cursor",
+    "backfill_complete",
+    "backfill_records",
+    "backfill_started_at",
+    "backfill_finished_at",
+]
+
+
 def get_sync_state(con: duckdb.DuckDBPyConnection, entity: str) -> dict[str, Any] | None:
-    """Return `{"high_water_mark": ..., "last_synced_at": ...}` for `entity`, or None.
+    """Return this entity's sync/backfill progress, or None if never synced.
 
     Returns None only if `entity` has never been synced at all (a full
     historical fetch should be done for it). Once synced at least once,
     `high_water_mark` may still be None if no records have ever been found
     for it, while `last_synced_at` is always set.
+
+    The `backfill_*` fields track the one-time walk back to the start of
+    the user's WHOOP history: `backfill_complete` is True once that walk
+    has reached the end, and `backfill_cursor` holds WHOOP's `next_token`
+    for where to resume while it has not.
     """
+    columns = ", ".join(_SYNC_STATE_COLUMNS)
     row = con.execute(
-        'SELECT high_water_mark, last_synced_at FROM sync_state WHERE entity = ?',
-        [entity],
+        f"SELECT {columns} FROM sync_state WHERE entity = ?", [entity]
     ).fetchone()
     if row is None:
         return None
-    return {"high_water_mark": row[0], "last_synced_at": row[1]}
+    return dict(zip(_SYNC_STATE_COLUMNS, row))
 
 
 def set_sync_state(
@@ -324,13 +352,60 @@ def set_sync_state(
     `high_water_mark` may be None if `entity` has been checked but no
     records have ever been found for it yet -- `last_synced_at` is still
     recorded so the skip-guard knows this endpoint has been attempted.
+
+    Backfill progress is left untouched: this is an UPDATE (with an INSERT
+    for a first-ever sync) rather than the INSERT OR REPLACE used
+    elsewhere, because replacing the row would blank the backfill columns
+    and send the next run back to the start of the user's history.
     """
-    _upsert(
-        con,
-        "sync_state",
-        ["entity", "high_water_mark", "last_synced_at"],
-        [(entity, high_water_mark, last_synced_at)],
+    updated = con.execute(
+        "UPDATE sync_state SET high_water_mark = ?, last_synced_at = ? WHERE entity = ?",
+        [high_water_mark, last_synced_at, entity],
+    ).fetchall()
+    if not _rows_changed(updated):
+        con.execute(
+            "INSERT INTO sync_state (entity, high_water_mark, last_synced_at) "
+            "VALUES (?, ?, ?) ON CONFLICT (entity) DO UPDATE SET "
+            "high_water_mark = excluded.high_water_mark, "
+            "last_synced_at = excluded.last_synced_at",
+            [entity, high_water_mark, last_synced_at],
+        )
+
+
+def set_backfill_progress(
+    con: duckdb.DuckDBPyConnection,
+    entity: str,
+    *,
+    cursor: str | None,
+    complete: bool,
+    records: int,
+    started_at: datetime | None = None,
+    finished_at: datetime | None = None,
+) -> None:
+    """Record where the historical backfill for `entity` has reached.
+
+    Called after every page so that a backfill stopped part-way -- by the
+    daily request budget, a redeploy, or a crash -- resumes from `cursor`
+    rather than re-walking (and re-spending request budget on) the years
+    it already stored.
+    """
+    con.execute(
+        "INSERT INTO sync_state (entity, backfill_cursor, backfill_complete, "
+        "backfill_records, backfill_started_at, backfill_finished_at) "
+        "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (entity) DO UPDATE SET "
+        "backfill_cursor = excluded.backfill_cursor, "
+        "backfill_complete = excluded.backfill_complete, "
+        "backfill_records = excluded.backfill_records, "
+        "backfill_started_at = COALESCE(sync_state.backfill_started_at, "
+        "excluded.backfill_started_at), "
+        "backfill_finished_at = excluded.backfill_finished_at",
+        [entity, cursor, complete, records, started_at, finished_at],
     )
+
+
+def _rows_changed(result: list[Any]) -> bool:
+    """Whether a DuckDB UPDATE touched any row (it reports a single count)."""
+    return bool(result) and bool(result[0]) and int(result[0][0]) > 0
 
 
 def upsert_profile(con: duckdb.DuckDBPyConnection, profile: dict[str, Any]) -> None:

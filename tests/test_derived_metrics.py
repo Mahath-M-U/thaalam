@@ -12,6 +12,7 @@ import pytest
 from thaalam import db
 from thaalam.services.derived_metrics import OPTION2_WEIGHTS, recompute
 from thaalam.services.nightly_job import run_nightly_job
+from thaalam import sync
 from thaalam.sync import backfill_window, reconcile_recent
 from thaalam.whoop_client.auth import TOKEN_FILE_PREFIX, WhoopAuth, _sealed_marker
 from thaalam.whoop_client.client import WhoopClient
@@ -274,7 +275,6 @@ def test_plaintext_token_migrates_to_encrypted(tmp_path, monkeypatch):
 
 def test_get_paginated_follows_next_token(monkeypatch):
     monkeypatch.delenv("WHOOP_TOKEN_KEY", raising=False)
-    monkeypatch.setattr("thaalam.whoop_client.client.PAGE_DELAY_SECONDS", 0)
     monkeypatch.setattr("thaalam.whoop_client.client.time.sleep", lambda *_a, **_k: None)
 
     pages = [
@@ -321,10 +321,11 @@ def _mock_whoop_client(captured: list) -> MagicMock:
     }
 
     def _capture(label):
-        def _fn(start_date=None, end_date=None):
+        def _fn(start_date=None, end_date=None, *, on_page=None, next_token=None):
             captured.append((label, start_date, end_date))
+            records = []
             if label == "cycles":
-                return [
+                records = [
                     {
                         "id": 1,
                         "user_id": USER_ID,
@@ -334,7 +335,13 @@ def _mock_whoop_client(captured: list) -> MagicMock:
                         "score": {"strain": 10.0},
                     }
                 ]
-            return []
+            if on_page is not None:
+                # Streaming callers (the historical backfill) get the records
+                # a page at a time and nothing back, the way the real client
+                # hands them over; `None` as the token means "last page".
+                on_page(records, None)
+                return []
+            return records
 
         return _fn
 
@@ -397,5 +404,19 @@ def test_nightly_job_reconciles_then_recomputes(tmp_path, monkeypatch):
     assert result["reconciliation"]["skipped"] is False
     assert result["baselines"]["n_nights"] == 15
     assert result["baselines"]["hrv_mean_90d"] is not None
-    for _label, start, end in captured:
+
+    # This database has never had a historical import, so the nightly job
+    # does that first (open-ended, from the history floor) and only then
+    # reconciles the editable recent window.
+    history = [c for c in captured if c[2] is None]
+    reconciled = [c for c in captured if c[2] is not None]
+    assert {label for label, _s, _e in history} == {
+        "cycles", "recovery", "sleep", "workouts"
+    }
+    assert all(start == sync.HISTORY_START for _label, start, _end in history)
+    assert result["history"]["skipped"] is False
+    assert result["history"]["history_complete"] is True
+
+    assert reconciled, "the nightly reconciliation still has to run"
+    for _label, start, end in reconciled:
         assert _window_days(start, end) == pytest.approx(7, abs=0.05)

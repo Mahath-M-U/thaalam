@@ -26,6 +26,23 @@ def tmp_db(tmp_path):
 
 
 @pytest.fixture(autouse=True)
+def _reset_whoop_rate_limiter():
+    """Give each test a fresh WHOOP request budget.
+
+    `thaalam.whoop_client.client` shares one limiter process-wide, on
+    purpose: WHOOP counts requests per application, and the API builds a
+    new client per sync. In a test run that same sharing would let one
+    test's requests pace -- or, at a small budget, stop -- an unrelated
+    one, with the outcome depending on collection order.
+    """
+    from thaalam.whoop_client import client as whoop_client
+
+    whoop_client._SHARED_LIMITER = None
+    yield
+    whoop_client._SHARED_LIMITER = None
+
+
+@pytest.fixture(autouse=True)
 def _reset_rate_limiter():
     """Clear the shared app's rate-limit counters between tests.
 
