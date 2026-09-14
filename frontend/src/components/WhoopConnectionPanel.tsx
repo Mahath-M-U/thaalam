@@ -35,7 +35,14 @@ export function WhoopConnectionPanel({ connected, isAdmin, syncing, onCheckAgain
   if (connected) {
     return (
       <>
-        <p>WHOOP is connected. A first import can take a few minutes for 90 days of history.</p>
+        {/* The first import walks the account's whole history back to the day
+            the strap was activated, paced under WHOOP's rate limits -- years
+            of data can take a while, and can even span more than one day,
+            so promise "a few minutes" to nobody. It resumes on its own. */}
+        <p>
+          WHOOP is connected and importing your full history. That can take a while the
+          first time; it picks up where it left off, so you can keep using the dashboard.
+        </p>
         {detail ? <p className="muted">{detail}</p> : null}
         <button type="button" className="btn" disabled={syncing} onClick={onCheckAgain}>
           {syncing ? "Checking…" : "Check again"}

@@ -1,8 +1,11 @@
 """Nightly baseline recompute and 7-day WHOOP reconciliation.
 
 Runnable as `run_nightly_job()` or `python -m thaalam.services.nightly_job`.
-Re-fetches the last 7 days (WHOOP records stay editable) then recomputes
-stored baselines. Band/regression slots stay empty until later PRs.
+First carries forward any unfinished historical import -- a multi-year
+history can exceed one day's WHOOP request budget, and this is what lets
+it finish without the user pressing Refresh until it does. Then re-fetches
+the last 7 days (WHOOP records stay editable) and recomputes stored
+baselines. Band/regression slots stay empty until later PRs.
 """
 
 from __future__ import annotations
@@ -13,7 +16,7 @@ from typing import Any
 
 from thaalam import db
 from thaalam.services.derived_metrics import recompute
-from thaalam.sync import RECONCILE_DAYS, reconcile_recent
+from thaalam.sync import RECONCILE_DAYS, reconcile_recent, resume_history_if_pending
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +49,14 @@ def run_nightly_job(
             logger.warning("WHOOP client has no token; skipping nightly job")
             return {"skipped": True, "reason": "not_connected"}
 
+        history = resume_history_if_pending(client, db_path, con=con)
+        if not history.get("skipped"):
+            logger.info(
+                "Historical import %s (%d record(s) this run)",
+                "still in progress" if history.get("partial") else "finished",
+                history.get("records", 0),
+            )
+
         recon = reconcile_recent(client, db_path, days=reconcile_days, con=con)
         if con is not None:
             baselines = recompute(con, trigger="nightly")
@@ -55,7 +66,12 @@ def run_nightly_job(
                 baselines = recompute(own, trigger="nightly")
             finally:
                 own.close()
-        return {"skipped": False, "reconciliation": recon, "baselines": baselines}
+        return {
+            "skipped": False,
+            "history": history,
+            "reconciliation": recon,
+            "baselines": baselines,
+        }
     finally:
         if close_client and hasattr(client, "close"):
             client.close()

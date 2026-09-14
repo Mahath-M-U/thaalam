@@ -2,7 +2,7 @@
 
 Deliberately a different database from ``data/whoop.duckdb``. DuckDB allows a
 single writer, and the API holds one process-wide writable connection, so
-sharing that file would let a 90-day WHOOP backfill block logins. Keeping the
+sharing that file would let a WHOOP historical backfill block logins. Keeping the
 security tables in SQLite also means they can be backed up and rotated
 separately from health data.
 

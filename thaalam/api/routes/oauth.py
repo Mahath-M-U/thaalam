@@ -32,7 +32,7 @@ from thaalam.auth.sessions import AuthenticatedUser
 from thaalam.config import get_settings
 from thaalam.logging_config import request_id_var
 from thaalam.services.derived_metrics import recompute
-from thaalam.sync import BACKFILL_DAYS, backfill_window
+from thaalam.sync import BACKFILL_DAYS, FULL_HISTORY, backfill_full_history, backfill_window
 from thaalam.whoop_client.client import WhoopClient
 
 logger = logging.getLogger(__name__)
@@ -153,6 +153,12 @@ def _frontend_base(request: Request) -> str:
 def _run_oauth_backfill(user_id: int | None) -> None:
     """Runs after the callback has already responded (see `background_tasks`).
 
+    Imports the account's whole WHOOP history, back to the day the strap
+    was first activated -- not a recent window. That is paced under
+    WHOOP's rate limits and resumable, so it can legitimately end here
+    unfinished; the nightly job and Refresh carry it on, and the audit
+    entry says which of the two happened.
+
     A failure here used to be visible only in the container's own logs --
     Administration -> Audit showed "whoop.connected" and then nothing, so a
     dashboard that stayed empty after a successful connect had no way to
@@ -165,12 +171,15 @@ def _run_oauth_backfill(user_id: int | None) -> None:
         client = build_whoop_client()
         con = acquire_writable_connection()
         try:
-            result = backfill_window(client, days=BACKFILL_DAYS, con=con)
+            if FULL_HISTORY:
+                result = backfill_full_history(client, con=con)
+            else:
+                result = backfill_window(client, days=BACKFILL_DAYS, con=con)
             recompute(con, trigger="backfill")
         finally:
             con.close()
     except Exception as exc:
-        logger.exception("90-day WHOOP backfill after OAuth failed")
+        logger.exception("WHOOP backfill after OAuth failed")
         with auth_store.connect() as auth_con:
             auth_store.record_audit(
                 auth_con,
@@ -184,11 +193,24 @@ def _run_oauth_backfill(user_id: int | None) -> None:
                 auth_con,
                 "whoop.backfill_completed",
                 user_id=user_id,
-                detail=f"{result.get('records', 0)} record(s) over {BACKFILL_DAYS} days",
+                detail=_backfill_detail(result),
             )
     finally:
         if client is not None:
             client.close()
+
+
+def _backfill_detail(result: dict[str, Any]) -> str:
+    """One line for the Audit table saying what the import actually got."""
+    records = result.get("records", 0)
+    if not FULL_HISTORY:
+        return f"{records} record(s) over {BACKFILL_DAYS} days"
+    if result.get("history_complete"):
+        return f"{records} record(s) -- full history imported"
+    return (
+        f"{records} record(s) so far -- the remaining history resumes on the "
+        "next sync (WHOOP daily request limit)"
+    )
 
 
 def _write_oauth_state(state: str, *, user_id: int | None = None) -> None:

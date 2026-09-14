@@ -1,4 +1,4 @@
-"""The background 90-day backfill after WHOOP OAuth connect records its own
+"""The background historical backfill after WHOOP OAuth connect records its own
 outcome to the audit log -- success or failure -- rather than only logging,
 so "connected, then nothing" is diagnosable from Administration -> Audit
 instead of requiring the container's own logs.
@@ -40,7 +40,9 @@ def _patch_client_and_connection(monkeypatch):
 def test_backfill_success_is_audited(auth_db_path, monkeypatch):
     _patch_client_and_connection(monkeypatch)
     monkeypatch.setattr(
-        oauth, "backfill_window", lambda client, days, con: {"records": 42, "mode": "backfill"}
+        oauth,
+        "backfill_full_history",
+        lambda client, con: {"records": 42, "mode": "history", "history_complete": True},
     )
     monkeypatch.setattr(oauth, "recompute", lambda con, trigger: None)
 
@@ -56,10 +58,10 @@ def test_backfill_success_is_audited(auth_db_path, monkeypatch):
 def test_backfill_failure_is_audited_with_the_real_error(auth_db_path, monkeypatch):
     _patch_client_and_connection(monkeypatch)
 
-    def _raise(client, days, con):
+    def _raise(client, con):
         raise RuntimeError("WHOOP API returned 503")
 
-    monkeypatch.setattr(oauth, "backfill_window", _raise)
+    monkeypatch.setattr(oauth, "backfill_full_history", _raise)
 
     oauth._run_oauth_backfill(user_id=3)
 
@@ -74,7 +76,9 @@ def test_backfill_failure_does_not_also_record_success(auth_db_path, monkeypatch
     """A failed backfill must not leave a misleading 'completed' row behind."""
     _patch_client_and_connection(monkeypatch)
     monkeypatch.setattr(
-        oauth, "backfill_window", lambda client, days, con: (_ for _ in ()).throw(RuntimeError("boom"))
+        oauth,
+        "backfill_full_history",
+        lambda client, con: (_ for _ in ()).throw(RuntimeError("boom")),
     )
 
     oauth._run_oauth_backfill(user_id=1)

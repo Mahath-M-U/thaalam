@@ -67,6 +67,36 @@ flow once; the token is cached encrypted under `data/`:
 uv run python -m thaalam.app
 ```
 
+### The first import goes all the way back
+
+Connecting an account imports **your entire WHOOP history** — every cycle,
+recovery, sleep and workout back to the day you first activated the strap,
+not a recent window. Later syncs are incremental from a stored high-water
+mark, with a three-day overlap because WHOOP keeps finalising scores for a
+few days.
+
+WHOOP allows 100 requests/minute and 10,000/day. Years of history is
+thousands of requests, so the import is **paced** under both limits rather
+than sprinting into a `429`, and it is **resumable**: each page is stored
+with the cursor for the next one, so an import interrupted by the daily
+limit, a redeploy, or a crash carries on from exactly where it stopped.
+The nightly job and the Refresh button both continue an unfinished import,
+so a very long history finishes on its own over a day or two. Nothing is
+re-fetched twice — upserts are keyed by WHOOP's own IDs.
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `WHOOP_FULL_HISTORY` | `true` | Set `false` to go back to importing a fixed recent window. |
+| `WHOOP_HISTORY_START` | `2014-01-01` | Floor for the history walk. WHOOP has no "account created" field, so this asks from before any consumer WHOOP existed and lets the API return nothing earlier than your first record. |
+| `WHOOP_BACKFILL_DAYS` | `90` | Size of that fixed window, when `WHOOP_FULL_HISTORY=false`. |
+| `WHOOP_REQUESTS_PER_MINUTE` | `90` | Client-side pacing, under WHOOP's 100. |
+| `WHOOP_REQUESTS_PER_DAY` | `9500` | Client-side pacing, under WHOOP's 10,000. |
+| `WHOOP_RECONCILE_DAYS` | `7` | How far back the nightly job re-reads for retroactive edits. |
+
+Progress lives in the `sync_state` table (`backfill_cursor`,
+`backfill_complete`, `backfill_records`), and Administration → Audit records
+whether a connect finished the history or left it resuming.
+
 ## 3. Start the API
 
 ```bash
@@ -257,7 +287,7 @@ it.
 
 **Auth data lives in its own SQLite database** (`data/thaalam_auth.db`), not
 the DuckDB file. DuckDB allows a single writer, so sharing it would let a
-90-day backfill block logins.
+historical backfill block logins.
 
 Two endpoints are reachable without a session, each deliberately: `/health`,
 for container health checks, and the WHOOP webhook, which authenticates by HMAC
