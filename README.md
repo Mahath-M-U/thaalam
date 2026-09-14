@@ -222,6 +222,13 @@ spent allowance surfaces as "try again shortly", not as an error.
 
 See `.env.example` for every knob.
 
+**Where it is going.** The assistant answers from one fixed grounding block and
+one model turn, so it cannot look anything up or take a second step — "how has
+my HRV moved this month?" has no path to an answer today.
+[`docs/AGENT_PLAN.md`](docs/AGENT_PLAN.md) is the agreed roadmap for giving it
+tools over the analytics that already exist, in phases, without leaving the free
+tier and without changing what leaves the machine.
+
 ## Security model
 
 **Accounts.** Two roles. `admin` can sync, connect WHOOP, and manage accounts;
