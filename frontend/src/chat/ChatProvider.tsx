@@ -183,6 +183,17 @@ export function ChatProvider({ page, readId = null, rangeDays = null, children }
     };
   }, [enabled, page]);
 
+  // The launcher is `position: fixed`, so it floats over whatever sits at the
+  // bottom-right of the viewport -- including the last thing on the page,
+  // which no amount of scrolling can then move out from under it. Layouts
+  // reserve its footprint at the end of their scroll area, but only when the
+  // assistant is actually configured: on an install without an API key
+  // nothing is rendered there and the reserved strip would just be a gap.
+  useEffect(() => {
+    document.body.classList.toggle("has-assistant", enabled);
+    return () => document.body.classList.remove("has-assistant");
+  }, [enabled]);
+
   useEffect(() => () => inFlight.current?.abort(), []);
 
   const ask = useCallback(
