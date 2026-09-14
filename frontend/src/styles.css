@@ -370,6 +370,13 @@ code {
   gap: 1rem;
 }
 
+/* A section that renders exactly one card (a preview still calibrating its
+   sibling, or a single-card group like the runway) has no second item to
+   sit beside -- span both columns rather than leaving half the row empty. */
+.chart-grid > *:only-child {
+  grid-column: 1 / -1;
+}
+
 .chart-card {
   background: var(--surface-card);
   border-radius: var(--radius);
@@ -867,7 +874,6 @@ code {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
   margin-bottom: 1.5rem;
-  max-width: 520px;
 }
 
 .score-ring-card.dimmed .score-ring-open {
@@ -1245,10 +1251,6 @@ code {
 
   .dive-parts {
     grid-template-columns: 1fr;
-  }
-
-  .score-ring-card {
-    max-width: none;
   }
 
   .score-parts li {
