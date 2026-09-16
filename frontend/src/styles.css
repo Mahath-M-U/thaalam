@@ -196,15 +196,45 @@ code {
 }
 
 .main {
+  /* Blocks in the page column set their own rhythm off this. */
+  --stack: 1.5rem;
   padding: 1.75rem 2rem 3rem;
   max-width: 1280px;
   width: 100%;
+  /* The column is capped, but the track it sits in is not. Centre it rather
+     than letting the content hug the sidebar with a dead gutter to its right
+     on anything wider than about 1500px. */
+  margin-inline: auto;
 }
 
 /* Scrolled to the bottom, the fixed launcher would otherwise sit on top of
    the last thing in the page -- the footer, or the brief's follow-up chips. */
 body.has-assistant .main {
   padding-bottom: max(3rem, var(--fab-reserve));
+}
+
+/* One vertical rhythm for whatever a tab stacks in the page column.
+   A tab renders a fragment, so its sections are direct children here
+   alongside the headline row and the cards the Today tab lays out loose --
+   and several of those carry no margin of their own, which left the headline
+   row, the daily brief and the vitality card fused edge to edge.
+
+   Adjacent margins collapse, so this is a floor rather than an override: a
+   block that already spaces itself further (a `.section`, the topbar) keeps
+   its own figure. */
+.main > * + *,
+.today-view > * + * {
+  margin-top: var(--stack, 1.5rem);
+}
+
+/* The deep dives are `position: fixed; inset: 0`. A margin on an element
+   anchored top and bottom shifts and shrinks it, so they sit outside the
+   rhythm. */
+.main > .vitality-dive-backdrop,
+.main > .runway-dive-backdrop,
+.today-view > .vitality-dive-backdrop,
+.today-view > .runway-dive-backdrop {
+  margin-top: 0;
 }
 
 .topbar {
@@ -1644,7 +1674,6 @@ body.has-assistant .runway-dive-backdrop {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
-  margin-bottom: 1.75rem;
 }
 
 .score-runway-row:not(:has(*)) {
@@ -2012,12 +2041,17 @@ body.has-assistant .mobile-body {
   color: var(--emerald);
 }
 
+/* The phone column runs tighter than the desktop one. See `.main` for what
+   reads this. */
+.today-view {
+  --stack: 1.15rem;
+}
+
 .today-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 1.15rem;
 }
 
 .today-kicker {
@@ -2098,10 +2132,6 @@ body.has-assistant .mobile-body {
   line-height: 1.35;
 }
 
-.today-score {
-  margin-bottom: 0.85rem;
-}
-
 .today-score.dimmed {
   opacity: 0.72;
 }
@@ -2145,7 +2175,6 @@ body.has-assistant .mobile-body {
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.95rem 1rem;
-  margin-bottom: 0.75rem;
 }
 
 .today-band strong {
@@ -2168,7 +2197,6 @@ body.has-assistant .mobile-body {
 .today-read {
   display: block;
   padding: 1rem 1.05rem;
-  margin-bottom: 0.75rem;
   cursor: default;
 }
 
@@ -2204,10 +2232,6 @@ body.has-assistant .mobile-body {
 
 .runway-card.is-compact:not([role="button"]) {
   cursor: default;
-}
-
-.today-signals {
-  margin-bottom: 1.15rem;
 }
 
 .today-signals-grid {
@@ -2295,10 +2319,6 @@ body.has-assistant .mobile-body {
   margin: 0 0 1rem;
 }
 
-.today-flagged {
-  margin-bottom: 1rem;
-}
-
 .today-flagged ul {
   list-style: none;
   margin: 0;
@@ -2335,6 +2355,17 @@ body.has-assistant .mobile-body {
   padding: 0.95rem 1.1rem;
   font-size: 1.02rem;
   font-weight: 700;
+}
+
+/* Full-bleed is a phone shape. Across the desktop page column it reads as a
+   slab rather than a button, so cap it and let it sit with the content. */
+@media (min-width: 960px) {
+  .today-cta {
+    width: auto;
+    min-width: 260px;
+    padding: 0.8rem 1.6rem;
+    font-size: 0.95rem;
+  }
 }
 
 .mobile-reads .reads-section {
@@ -3350,11 +3381,35 @@ body.has-assistant .mobile-body {
    an instrument panel rather than a set of matching dials. Hairline rules
    between columns, numerals doing the work, in the same editorial dark/amber
    system as the rest of the dashboard.
+
+   Two things hold the panel together:
+
+   1. The row is one grid and each column is a subgrid of it, so the kicker,
+      the numeral, the rail, the state line and the delta each land on one
+      shared baseline across all three columns. Setting three scores abreast
+      is only worth doing if they can be read across. Rows are assigned
+      explicitly rather than by auto-placement, because a compact column drops
+      its state line and a score with no 14-night delta drops that one --
+      auto-placement would slide what remains up into the wrong row.
+
+   2. The type scale follows the panel's own width, not the viewport's. The
+      two are not the same thing anywhere in this app: the desktop panel is
+      the page column minus the sidebar, and the mobile shell caps its body at
+      448px however wide the tablet is. Keying off the viewport put a 2.6rem
+      numeral in a 149px column between 721px and 959px, where it overflowed
+      and was clipped by the panel's own `overflow: hidden`.
+
+   So the scale below is written smallest-first and grown by container query.
+   A browser without container queries gets the compact scale throughout:
+   smaller than it needs to be on a desktop, but never clipped.
 --------------------------------------------------------------------------- */
 
 .headline {
+  container-type: inline-size;
+  container-name: scores;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: auto auto auto 1fr auto;
   background: var(--surface-card);
   border: 1px solid var(--hairline);
   border-radius: var(--radius);
@@ -3373,14 +3428,17 @@ body.has-assistant .mobile-body {
 }
 
 .headline-col {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 20px 18px 18px;
+  position: relative;
+  display: grid;
+  grid-row: 1 / -1;
+  grid-template-rows: subgrid;
+  row-gap: 8px;
+  align-content: start;
+  justify-items: start;
+  min-width: 0;
+  padding: 14px 10px 12px;
   background: none;
   border: 0;
-  border-left: 1px solid var(--hairline);
   color: inherit;
   font: inherit;
   text-align: left;
@@ -3388,13 +3446,48 @@ body.has-assistant .mobile-body {
   transition: background 140ms ease;
 }
 
-.headline-col:first-child {
-  border-left: 0;
+/* Nothing in this row may leave its column: the panel clips, so an overflow
+   is a truncated numeral rather than a scrollbar. */
+.headline-col > * {
+  max-width: 100%;
+}
+
+/* The rule between columns, inset from the panel's edges rather than run
+   full-bleed into its rounded corners. */
+.headline-col + .headline-col::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 1px;
+  background: var(--hairline);
+}
+
+/* Nothing else in the row says these columns are links to their tabs. The
+   accent is the affordance: a hairline that lights amber along the top edge
+   of whichever column is under the pointer or holding focus. */
+.headline-col::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: var(--amber);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 180ms ease;
 }
 
 .headline-col:hover,
 .headline-col:focus-visible {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.headline-col:hover::after,
+.headline-col:focus-visible::after {
+  transform: scaleX(1);
 }
 
 .headline-col:focus-visible {
@@ -3403,20 +3496,50 @@ body.has-assistant .mobile-body {
 }
 
 .headline-kicker {
-  font-size: 0.68rem;
-  letter-spacing: 0.14em;
+  grid-row: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  font-size: 0.6rem;
+  line-height: 1.3;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
+/* The chevron marks the column as a way into its tab. Pointer affordance
+   only -- a column this size is already a tap target, and on a phone the
+   room is better spent on the title. It keeps its space at rest so the
+   kicker does not reflow under the pointer. */
+.headline-go {
+  display: none;
+  margin-left: auto;
+  font-style: normal;
+  font-size: 0.95rem;
+  line-height: 1;
+  color: var(--muted-soft);
+  transition: color 140ms ease, transform 140ms ease;
+}
+
+.headline-col:hover .headline-go,
+.headline-col:focus-visible .headline-go {
+  color: var(--amber);
+  transform: translateX(2px);
+}
+
 .headline-figure {
+  grid-row: 2;
   display: flex;
   align-items: baseline;
-  gap: 7px;
+  /* Last resort at a width no breakpoint anticipated: the denominator drops
+     to its own line rather than running out of the column. */
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 .headline-figure strong {
-  font-size: 2.6rem;
+  font-size: 1.6rem;
   line-height: 1;
   font-weight: 500;
   color: var(--ink);
@@ -3424,9 +3547,12 @@ body.has-assistant .mobile-body {
   letter-spacing: -0.02em;
 }
 
+/* Narrow columns drop the denominator first: the kicker already names the
+   score and the rail already draws the scale. */
 .headline-figure em {
+  display: none;
   font-style: normal;
-  font-size: 0.72rem;
+  font-size: 0.62rem;
   color: var(--muted);
   letter-spacing: 0.04em;
 }
@@ -3436,25 +3562,59 @@ body.has-assistant .mobile-body {
 }
 
 .headline-state {
-  font-size: 0.82rem;
+  grid-row: 4;
+  align-self: start;
+  font-size: 0.74rem;
   line-height: 1.35;
   color: var(--body);
+  /* A line budget rather than a free-running paragraph, so the deltas below
+     stay on one baseline and inside the panel. */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
+/* The 14-night delta. A chip rather than loose text, and the direction is a
+   glyph as well as a colour -- up and down were previously told apart by
+   amber against grey alone, which is the one channel a reader may not have.
+   Rising is the base state (the component still tags it `.up`); `.down` and
+   `.flat` step it back off the amber. */
 .headline-delta {
-  font-size: 0.72rem;
-  letter-spacing: 0.05em;
+  grid-row: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border: 1px solid var(--amber-35);
+  border-radius: var(--radius-pill);
+  font-size: 0.64rem;
+  letter-spacing: 0.04em;
   color: var(--amber);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.headline-delta i {
+  font-style: normal;
+  font-size: 0.62em;
+  line-height: 1;
 }
 
 .headline-delta.down {
+  border-color: var(--hairline);
   color: var(--muted);
+}
+
+.headline-delta.flat {
+  border-color: var(--hairline);
+  color: var(--muted-soft);
 }
 
 /* ---- Rails: one instrument per scale ---- */
 
 .rail {
+  grid-row: 3;
   display: block;
   width: 100%;
 }
@@ -3490,7 +3650,7 @@ body.has-assistant .mobile-body {
 .rail-pips {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
 }
 
 .rail-pips .pip {
@@ -3498,6 +3658,7 @@ body.has-assistant .mobile-body {
   height: 6px;
   border-radius: 2px;
   background: var(--chrome);
+  transition: background 260ms ease;
 }
 
 .rail-pips .pip.is-lit {
@@ -3539,76 +3700,167 @@ body.has-assistant .mobile-body {
   margin-left: -5px;
   border-radius: 50%;
   background: var(--amber);
+  /* The ring keeps the marker legible where it crosses the midpoint hairline
+     or sits near either end of the track. */
+  box-shadow: 0 0 0 3px var(--surface-card);
   transform: translateY(-50%);
   transition: left 260ms ease;
 }
 
-/* Stay abreast on a phone -- three scores side by side is the whole point of
-   the row, so the type shrinks rather than the columns stacking. The state
-   line is what gives way: mobile renders the panel compact and the daily
-   brief underneath carries the narrative. */
-@media (max-width: 720px) {
-  .headline-col {
-    gap: 8px;
-    padding: 14px 10px 12px;
-  }
+/* A score still calibrating has no reading to plot. Its rail says "not yet"
+   rather than "zero": the track is hatched, and no fill, pip or marker is
+   lit. */
+.headline-col.is-calibrating .rail-track,
+.headline-col.is-calibrating .rail-pips .pip {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    var(--hairline) 0 2px,
+    transparent 2px 5px
+  );
+}
 
-  /* Two of the three titles wrap at phone width. Reserving both lines for
-     all three keeps the numerals on one baseline across the row, which is
-     the whole point of setting them abreast. */
-  .headline-kicker {
-    font-size: 0.6rem;
-    letter-spacing: 0.1em;
-    min-height: 2.1em;
-  }
+.headline-col.is-calibrating .rail-fill,
+.headline-col.is-calibrating .rail-marker {
+  display: none;
+}
 
-  .headline-figure {
-    gap: 4px;
-  }
+/* ---- The scale, grown by the panel's own width ---- */
 
+/* Room for the denominator beside the numeral. */
+@container scores (min-width: 380px) {
   .headline-figure strong {
     font-size: 1.9rem;
   }
 
   .headline-figure em {
-    font-size: 0.62rem;
-  }
-
-  .headline-state {
-    font-size: 0.74rem;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
-  .headline-delta {
-    font-size: 0.66rem;
-  }
-
-  .rail-pips {
-    gap: 2px;
+    display: inline;
   }
 }
 
-/* The narrowest phones: the denominator is the first thing to go, since the
-   kicker already names the score and the rail already shows the scale. */
-@media (max-width: 400px) {
+/* The mobile shell's widest body, and the desktop page column on a small
+   laptop. Enough room to open the type up without crowding the rules. */
+@container scores (min-width: 560px) {
   .headline-col {
-    padding: 12px 7px 10px;
+    row-gap: 9px;
+    padding: 16px 13px 14px;
+  }
+
+  .headline-col + .headline-col::before {
+    top: 12px;
+    bottom: 12px;
+  }
+
+  .headline-kicker {
+    font-size: 0.64rem;
+    letter-spacing: 0.12em;
+  }
+
+  .headline-figure {
+    gap: 6px;
   }
 
   .headline-figure strong {
-    font-size: 1.6rem;
+    font-size: 2rem;
   }
 
   .headline-figure em {
-    display: none;
+    font-size: 0.66rem;
+  }
+
+  .headline-state {
+    font-size: 0.78rem;
+  }
+}
+
+/* Full editorial scale: the desktop page column. */
+@container scores (min-width: 720px) {
+  .headline-col {
+    row-gap: 10px;
+    padding: 18px 18px 16px;
+  }
+
+  .headline-col + .headline-col::before {
+    top: 14px;
+    bottom: 14px;
+  }
+
+  .headline-go {
+    display: block;
+  }
+
+  .headline-kicker {
+    font-size: 0.68rem;
+    letter-spacing: 0.14em;
+  }
+
+  .headline-figure {
+    gap: 7px;
+  }
+
+  .headline-figure strong {
+    font-size: 2.6rem;
+  }
+
+  .headline-figure em {
+    font-size: 0.72rem;
+  }
+
+  .headline-state {
+    font-size: 0.82rem;
+    /* Two lines is the budget here: a third pushes the deltas past the fold
+       of the panel on a laptop, and is never the part of the sentence that
+       carries the reading. */
+    -webkit-line-clamp: 2;
+  }
+
+  .headline-delta {
+    gap: 5px;
+    padding: 3px 8px;
+    font-size: 0.7rem;
+  }
+
+  .rail-pips {
+    gap: 3px;
+  }
+}
+
+/* Browsers without subgrid still get the two things it buys: the numerals on
+   one baseline (the kicker reserves its tallest wrapped height) and the
+   deltas on one baseline (pinned to the bottom of the column). */
+@supports not (grid-template-rows: subgrid) {
+  .headline-col {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .headline-kicker {
+    min-height: 2.6em;
+  }
+
+  .headline-state {
+    margin-bottom: auto;
+  }
+}
+
+/* The rails animate to say a reading moved. Where motion is unwelcome they
+   still land on the right value, they just get there at once. */
+@media (prefers-reduced-motion: reduce) {
+  .headline-col,
+  .headline-col::after,
+  .headline-go,
+  .rail-fill,
+  .rail-pips .pip,
+  .rail-index .rail-marker {
+    transition: none;
   }
 }
 
 .whoop-tab-note {
-  margin: 0 0 4px;
+  /* Spacing comes from the page column's rhythm; the note sets none of its
+     own. It used to carry a 4px bottom margin and nothing above, which left
+     it jammed against the headline panel. */
+  margin: 0;
   padding: 12px 14px;
   border: 1px solid var(--hairline);
   border-radius: var(--radius-sm);

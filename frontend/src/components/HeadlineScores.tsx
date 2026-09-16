@@ -57,14 +57,23 @@ function HeadlineColumn({
   onOpen: () => void;
 }) {
   const calibrating = score.calibrating || score.value == null;
+  const delta = score.delta_14d;
+  const showDelta = delta != null && !calibrating;
   return (
     <button
       type="button"
       className={`headline-col${calibrating ? " is-calibrating" : ""}`}
       onClick={onOpen}
-      aria-label={`${score.title}: ${figureLabel(score)}. Open the ${score.tab} tab.`}
+      aria-label={columnLabel(score, calibrating)}
     >
-      <span className="headline-kicker">{score.title}</span>
+      <span className="headline-kicker">
+        {score.title}
+        {/* Marks the column as the way into its tab; the styling hides it
+            where the whole column is already a tap target. */}
+        <i className="headline-go" aria-hidden="true">
+          ›
+        </i>
+      </span>
 
       <span className="headline-figure">
         <strong>{formatValue(score)}</strong>
@@ -79,13 +88,16 @@ function HeadlineColumn({
         </span>
       )}
 
-      {score.delta_14d != null && !calibrating ? (
-        <span className={`headline-delta${score.delta_14d < 0 ? " down" : ""}`}>
+      {showDelta ? (
+        <span className={`headline-delta ${deltaTone(delta)}`}>
+          {/* Direction as a glyph as well as a colour, so the reading does
+              not rest on amber-against-grey alone. */}
+          <i aria-hidden="true">{deltaMark(delta)}</i>
           {/* Compact columns are ~100px wide; the long form wraps and leaves
               the row's baselines ragged. */}
           {compact
-            ? `${formatDelta(score.delta_14d)} · 14n`
-            : `${formatDelta(score.delta_14d)} in 14 nights`}
+            ? `${formatDelta(delta)} · 14n`
+            : `${formatDelta(delta)} in 14 nights`}
         </span>
       ) : null}
     </button>
@@ -172,6 +184,40 @@ function denominator(score: HeadlineScore): string {
 function figureLabel(score: HeadlineScore): string {
   if (score.calibrating || score.value == null) return "calibrating";
   return `${formatValue(score)} ${denominator(score)}`;
+}
+
+/**
+ * What a screen reader gets for the column. The rail, the state line and the
+ * delta's direction are all drawn rather than spelled out, so the label says
+ * them: the column is one button, and this is the only pass over it.
+ */
+function columnLabel(score: HeadlineScore, calibrating: boolean): string {
+  const parts = [`${score.title}: ${figureLabel(score)}`];
+  const state = calibrating ? calibratingCopy(score) : score.state;
+  if (state) parts.push(state);
+  if (score.delta_14d != null && !calibrating) {
+    const delta = score.delta_14d;
+    const direction = delta > 0 ? "up" : delta < 0 ? "down" : "unchanged";
+    parts.push(
+      delta === 0
+        ? "unchanged over 14 nights"
+        : `${direction} ${Math.abs(delta)} in 14 nights`,
+    );
+  }
+  parts.push(`Open the ${score.tab} tab`);
+  return `${parts.join(". ")}.`;
+}
+
+function deltaTone(delta: number): string {
+  if (delta > 0) return "up";
+  if (delta < 0) return "down";
+  return "flat";
+}
+
+function deltaMark(delta: number): string {
+  if (delta > 0) return "▲";
+  if (delta < 0) return "▼";
+  return "–";
 }
 
 function calibratingCopy(score: HeadlineScore): string {
