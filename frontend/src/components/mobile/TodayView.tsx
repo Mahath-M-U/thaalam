@@ -223,7 +223,12 @@ export function TodayView({
                     <p>{signalCaption(read)}</p>
                   </div>
                   {read.calibrating || read.sparkline.length < 2 ? null : (
-                    <Sparkline values={read.sparkline} favourable={read.favourable !== false} width={72} height={28} />
+                    <Sparkline
+                      values={read.sparkline}
+                      favourable={read.favourable !== false}
+                      height={28}
+                      fluid
+                    />
                   )}
                 </div>
               </button>
@@ -317,24 +322,36 @@ function signalTitle(read: DerivedRead): string {
   return read.title;
 }
 
+/**
+ * `String(-1)` is a hyphen-minus; the minutes branch below has always written
+ * a real minus sign. Side by side in the signals grid that read as two
+ * different characters, because it was. Everything negative goes through here.
+ *
+ * A magnitude that rounded away to nothing gets no sign either way: "−0 bpm"
+ * is not a reading.
+ */
+function signed(magnitude: string, value: number): string {
+  if (value >= 0 || !/[1-9]/.test(magnitude)) return magnitude;
+  return `−${magnitude}`;
+}
+
 function formatSignalValue(read: DerivedRead): string {
   if (read.calibrating || read.value == null) return "—";
   const value = read.value;
   if (read.unit === "min") {
-    const sign = value < 0 ? "−" : "";
     const abs = Math.abs(value);
     const hours = Math.floor(abs / 60);
     const minutes = Math.round(abs % 60);
-    if (hours > 0) return `${sign}${hours}h ${minutes}m`;
-    return `${sign}${Math.round(abs)}m`;
+    return signed(hours > 0 ? `${hours}h ${minutes}m` : `${Math.round(abs)}m`, value);
   }
   if (read.unit === "min/h" || read.unit === "bpm" || read.unit === "%") {
-    const rounded = Math.round(value);
-    if (read.unit === "bpm" && rounded > 0) return `+${rounded}`;
-    return String(rounded);
+    const rounded = Math.round(Math.abs(value));
+    if (read.unit === "bpm" && value > 0 && rounded > 0) return `+${rounded}`;
+    return signed(String(rounded), value);
   }
-  if (read.unit === "ms/u") return value.toFixed(1);
-  return Math.abs(value) >= 10 ? value.toFixed(0) : value.toFixed(1);
+  if (read.unit === "ms/u") return signed(Math.abs(value).toFixed(1), value);
+  const abs = Math.abs(value);
+  return signed(abs >= 10 ? abs.toFixed(0) : abs.toFixed(1), value);
 }
 
 function signalCaption(read: DerivedRead): string {
