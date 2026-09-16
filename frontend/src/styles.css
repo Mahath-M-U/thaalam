@@ -2283,12 +2283,26 @@ body.has-assistant .mobile-body {
   min-width: 0;
 }
 
-/* Drawn at a fixed size, so never flex-shrunk; `margin-top: auto` pins it to
-   the bottom of the card, which the grid stretches to the row's height. */
+/* The trace runs the width of the card, and `margin-top: auto` pins it to the
+   bottom of the card the grid has stretched to the row's height -- so all the
+   traces in a row sit on one baseline however long their captions ran.
+
+   It used to be drawn at a fixed 72px and pushed to the right-hand edge,
+   which left a ~100px gutter beside it and read as a squiggle floating in the
+   corner rather than as the card's own footer. On a card whose caption is
+   short, that gutter and the space above it were most of the card. */
 .signal-card-body > svg {
   flex: none;
-  align-self: flex-end;
+  align-self: stretch;
+  width: 100%;
   margin-top: auto;
+}
+
+/* A hairline for the trace to sit on. It gives the bottom of the card an edge
+   to resolve against, which is what makes the space above it read as breathing
+   room rather than as something missing. */
+.signal-card-body > svg.is-fluid {
+  border-bottom: 1px solid var(--hairline);
 }
 
 .signal-card strong {
@@ -2308,8 +2322,12 @@ body.has-assistant .mobile-body {
   color: var(--amber);
 }
 
+/* The same sentence as `.flagged-row p` below, so the same colour. These were
+   amber, and a flagged read printed its finding twice on one screen -- amber
+   in the grid, grey in the flagged list. Amber stays on the figure's unit,
+   which is the part that is actually a reading. */
 .signal-card p {
-  color: var(--amber-60);
+  color: var(--muted);
   font-size: 0.72rem;
 }
 
@@ -2319,10 +2337,17 @@ body.has-assistant .mobile-body {
   margin: 0 0 1rem;
 }
 
+/* The rows are cards, so they need the gap the other two lists on this screen
+   already have (`.reads-list`, `.today-signals-grid`). Without one, three
+   16px-radius cards stacked flush pinched into each other at every join and
+   the list read as one ragged block. */
 .today-flagged ul {
   list-style: none;
   margin: 0;
   padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
 }
 
 .flagged-row {
@@ -2330,6 +2355,15 @@ body.has-assistant .mobile-body {
   align-items: center;
   gap: 0.75rem;
   padding: 0.9rem 1rem;
+}
+
+/* The copy takes the room left over, which puts the chevron on the row's right
+   edge. It used to sit wherever the text happened to end, so a short finding
+   parked its chevron mid-row while a long one pushed it to the margin, and
+   the column of chevrons down the list was ragged. */
+.flagged-row > div {
+  flex: 1;
+  min-width: 0;
 }
 
 .flagged-mark {

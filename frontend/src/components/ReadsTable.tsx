@@ -68,11 +68,18 @@ export function Sparkline({
   favourable,
   width = 88,
   height = 28,
+  fluid = false,
 }: {
   values: number[];
   favourable: boolean;
   width?: number;
   height?: number;
+  /**
+   * Stretch to the width of whatever holds it instead of drawing at `width`.
+   * `width` stays the viewBox, so the trace keeps its shape; the stroke is
+   * pinned so stretching cannot fatten it.
+   */
+  fluid?: boolean;
 }) {
   const nums = values.filter((v) => Number.isFinite(v));
   if (nums.length < 2) return null;
@@ -88,13 +95,21 @@ export function Sparkline({
     })
     .join(" ");
   return (
-    <svg className="sparkline" width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden="true">
+    <svg
+      className={`sparkline${fluid ? " is-fluid" : ""}`}
+      width={fluid ? "100%" : width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio={fluid ? "none" : undefined}
+      aria-hidden="true"
+    >
       <polyline
         fill="none"
         stroke={favourable ? AMBER : "#8A8A8A"}
         strokeWidth="2"
         strokeLinejoin="round"
         strokeLinecap="round"
+        vectorEffect={fluid ? "non-scaling-stroke" : undefined}
         points={points}
       />
     </svg>
