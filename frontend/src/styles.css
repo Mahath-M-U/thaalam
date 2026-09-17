@@ -222,8 +222,15 @@ body.has-assistant .main {
    Adjacent margins collapse, so this is a floor rather than an override: a
    block that already spaces itself further (a `.section`, the topbar) keeps
    its own figure. */
-.main > * + *,
-.today-view > * + * {
+/* `:not(:first-child)` matches the same elements as `* + *`, and is used for
+   its specificity. This is a layout primitive that sits near the top of the
+   file, so at one class it lost every tie to a component rule further down
+   writing a `margin` shorthand -- which is exactly what `.whoop-tab-note`
+   did, silently zeroing its own top margin and leaving the WHOOP tab's note
+   flush against the headline panel. `:not()` takes its argument's
+   specificity, so this is two classes' worth and holds. */
+.main > :not(:first-child),
+.today-view > :not(:first-child) {
   margin-top: var(--stack, 1.5rem);
 }
 
@@ -3892,8 +3899,7 @@ body.has-assistant .mobile-body {
 
 .whoop-tab-note {
   /* Spacing comes from the page column's rhythm; the note sets none of its
-     own. It used to carry a 4px bottom margin and nothing above, which left
-     it jammed against the headline panel. */
+     own. The shorthand is safe now that the rhythm rule outranks it. */
   margin: 0;
   padding: 12px 14px;
   border: 1px solid var(--hairline);
